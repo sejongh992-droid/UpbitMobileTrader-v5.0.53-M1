@@ -1,0 +1,68 @@
+name: Build UpbitMobileTrader APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'UpbitMobileTrader_v5_0_53_M1_GitHubActions_BuildReady.zip'
+      - '.github/workflows/build-apk.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Verify project archive
+        run: |
+          test -f UpbitMobileTrader_v5_0_53_M1_GitHubActions_BuildReady.zip
+          echo 'fb642fac4ab4722c901f3968029d6f8ba6b21af53d3e8c9f1b1a75a983dc675f  UpbitMobileTrader_v5_0_53_M1_GitHubActions_BuildReady.zip' | sha256sum -c -
+          unzip -t UpbitMobileTrader_v5_0_53_M1_GitHubActions_BuildReady.zip
+
+      - name: Extract project
+        run: |
+          mkdir project
+          unzip -q UpbitMobileTrader_v5_0_53_M1_GitHubActions_BuildReady.zip -d project
+
+      - name: Compile Python sources
+        run: python -m compileall -q project/app/src/main/python
+
+      - name: Build debug APK
+        working-directory: project
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Verify APK
+        working-directory: project
+        run: |
+          test -f app/build/outputs/apk/debug/app-debug.apk
+          unzip -t app/build/outputs/apk/debug/app-debug.apk
+          sha256sum app/build/outputs/apk/debug/app-debug.apk | tee app/build/outputs/apk/debug/app-debug.apk.sha256
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: UpbitMobileTrader-v5.0.53-M1-debug
+          path: |
+            project/app/build/outputs/apk/debug/app-debug.apk
+            project/app/build/outputs/apk/debug/app-debug.apk.sha256
+          if-no-files-found: error
+          retention-days: 7
