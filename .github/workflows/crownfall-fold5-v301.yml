@@ -59,7 +59,7 @@ jobs:
 
           data = base64.b64decode(encoded, validate=True)
           digest = hashlib.sha256(data).hexdigest()
-          expected_digest = '9d907d025e06188875f1080a6092aec9a7e40c055e937613b871475c0c636781'
+          expected_digest = '4908bf79340bbfcfce350f2b89f71096a219f222011d2e32fc57ea1cb632c9bb'
           if digest != expected_digest:
               raise SystemExit(f'project SHA-256 mismatch: {digest}')
 
