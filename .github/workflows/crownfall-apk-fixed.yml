@@ -1,0 +1,217 @@
+name: Crownfall APK Fixed Output
+
+on:
+  push:
+    branches:
+      - crownfall-apk-build-20260903
+    paths:
+      - 'crownfall_payload/**'
+      - '.github/workflows/crownfall-apk-fixed.yml'
+      - 'crownfall_build_trigger.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: crownfall-apk-build-20260903
+
+      - name: Prepare output directory
+        run: |
+          mkdir -p crownfall_build_output reconstructed
+          echo 'BUILD_STARTED' > crownfall_build_output/BUILD_STATUS.txt
+
+      - name: Reconstruct Android project from complete ZIP entries
+        id: reconstruct
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat crownfall_payload/project.b64.part00 \
+              crownfall_payload/project.b64.part01 \
+              crownfall_payload/project.b64.part02 \
+              crownfall_payload/project.b64.part03 \
+              > reconstructed/project.partial.b64
+          base64 --decode reconstructed/project.partial.b64 > reconstructed/project.partial.zip
+
+          python3 - <<'PY' | tee crownfall_build_output/reconstruct.log
+          import os, struct, zlib
+          from pathlib import Path
+
+          archive = Path('reconstructed/project.partial.zip').read_bytes()
+          root = Path('reconstructed')
+          pos = 0
+          extracted = []
+
+          while True:
+              sig = archive.find(b'PK\x03\x04', pos)
+              if sig < 0 or sig + 30 > len(archive):
+                  break
+              fields = struct.unpack_from('<IHHHHHIIIHH', archive, sig)
+              _, version, flags, method, mtime, mdate, crc, csize, usize, nlen, xlen = fields
+              name_start = sig + 30
+              name_end = name_start + nlen
+              data_start = name_end + xlen
+              if data_start > len(archive):
+                  break
+              name = archive[name_start:name_end].decode('utf-8', errors='replace')
+              if not name or name.startswith('/') or '..' in Path(name).parts:
+                  raise SystemExit(f'Unsafe path: {name!r}')
+
+              if flags & 0x08:
+                  if method != 8:
+                      print(f'STOP unsupported streamed entry: {name}')
+                      break
+                  d = zlib.decompressobj(-15)
+                  payload = d.decompress(archive[data_start:])
+                  if not d.eof:
+                      print(f'STOP incomplete streamed entry: {name}')
+                      break
+                  consumed = len(archive[data_start:]) - len(d.unused_data)
+                  data_end = data_start + consumed
+              else:
+                  data_end = data_start + csize
+                  if data_end > len(archive):
+                      print(f'STOP incomplete entry: {name}')
+                      break
+                  raw = archive[data_start:data_end]
+                  if method == 0:
+                      payload = raw
+                  elif method == 8:
+                      payload = zlib.decompress(raw, -15)
+                  else:
+                      print(f'STOP unsupported method {method}: {name}')
+                      break
+
+              target = root / name
+              if name.endswith('/'):
+                  target.mkdir(parents=True, exist_ok=True)
+              else:
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  target.write_bytes(payload)
+                  extracted.append(name)
+              pos = data_end
+
+          required = [
+              'KingdomRemnantCrownfall/settings.gradle',
+              'KingdomRemnantCrownfall/build.gradle',
+              'KingdomRemnantCrownfall/gradle.properties',
+              'KingdomRemnantCrownfall/app/build.gradle',
+              'KingdomRemnantCrownfall/app/src/main/AndroidManifest.xml',
+              'KingdomRemnantCrownfall/app/src/main/java/com/sejong/kingdomremnant/MainActivity.java',
+              'KingdomRemnantCrownfall/app/src/main/assets/game/index.html',
+              'KingdomRemnantCrownfall/app/src/main/assets/game/game.js',
+              'KingdomRemnantCrownfall/app/src/main/assets/game/world3d.js',
+              'KingdomRemnantCrownfall/app/src/main/assets/game/styles.css',
+              'KingdomRemnantCrownfall/app/src/main/assets/game/commercial-v3.css',
+              'KingdomRemnantCrownfall/app/src/owner/AndroidManifest.xml',
+              'KingdomRemnantCrownfall/app/src/store/AndroidManifest.xml',
+          ]
+          missing = [p for p in required if not (root / p).is_file()]
+          print(f'PARTIAL_ZIP_BYTES={len(archive)}')
+          print(f'EXTRACTED_COMPLETE_FILES={len(extracted)}')
+          for p in required:
+              if (root / p).is_file():
+                  print(f'OK {p} {(root / p).stat().st_size}')
+          if missing:
+              raise SystemExit('MISSING REQUIRED FILES:\n' + '\n'.join(missing))
+          PY
+
+          python3 - <<'PY'
+          from pathlib import Path
+          manifest = Path('reconstructed/KingdomRemnantCrownfall/app/src/main/AndroidManifest.xml')
+          text = manifest.read_text(encoding='utf-8')
+          text = text.replace('@mipmap/ic_launcher_round', '@drawable/ic_launcher_foreground')
+          text = text.replace('@mipmap/ic_launcher', '@drawable/ic_launcher_foreground')
+          manifest.write_text(text, encoding='utf-8')
+          PY
+
+          echo 'RECONSTRUCT_OK' > crownfall_build_output/BUILD_STATUS.txt
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install API 36 and Build Tools 36
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager 'platform-tools' 'platforms;android-36' 'build-tools;36.0.0'
+
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Compile OWNER and STORE APKs
+        id: compile
+        working-directory: reconstructed/KingdomRemnantCrownfall
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle :app:assembleOwnerDebug :app:assembleStoreDebug --no-daemon --stacktrace 2>&1 | tee ../../crownfall_build_output/gradle-build.log
+          echo 'COMPILE_OK' > ../../crownfall_build_output/BUILD_STATUS.txt
+
+      - name: Verify APK signatures, packages and bundled game
+        id: verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          OWNER_APK=$(find reconstructed/KingdomRemnantCrownfall/app/build/outputs/apk -type f -iname '*owner*debug*.apk' | head -n 1)
+          STORE_APK=$(find reconstructed/KingdomRemnantCrownfall/app/build/outputs/apk -type f -iname '*store*debug*.apk' | head -n 1)
+          test -f "$OWNER_APK"
+          test -f "$STORE_APK"
+
+          cp "$OWNER_APK" crownfall_build_output/Crownfall-v3.0.0-OWNER.apk
+          cp "$STORE_APK" crownfall_build_output/Crownfall-v3.0.0-STORE.apk
+
+          APKSIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+
+          for apk in crownfall_build_output/*.apk; do
+            "$APKSIGNER" verify --verbose --print-certs "$apk" | tee "${apk%.apk}-signature.txt"
+            "$AAPT" dump badging "$apk" | tee "${apk%.apk}-badging.txt"
+            unzip -t "$apk" >/dev/null
+            unzip -l "$apk" | grep -q 'classes.dex'
+            unzip -l "$apk" | grep -q 'assets/game/index.html'
+            unzip -l "$apk" | grep -q 'assets/game/game.js'
+            unzip -l "$apk" | grep -q 'assets/game/world3d.js'
+          done
+
+          sha256sum crownfall_build_output/*.apk | tee crownfall_build_output/SHA256SUMS.txt
+          (cd crownfall_build_output && zip -9 Crownfall-v3.0.0-APK-2PACK.zip \
+             Crownfall-v3.0.0-OWNER.apk Crownfall-v3.0.0-STORE.apk \
+             SHA256SUMS.txt *-signature.txt *-badging.txt)
+          echo 'BUILD_AND_VERIFY_OK' > crownfall_build_output/BUILD_STATUS.txt
+
+      - name: Write failure status
+        if: failure()
+        shell: bash
+        run: |
+          echo 'BUILD_FAILED' > crownfall_build_output/BUILD_STATUS.txt
+          echo "run_id=${GITHUB_RUN_ID}" >> crownfall_build_output/BUILD_STATUS.txt
+          echo "run_attempt=${GITHUB_RUN_ATTEMPT}" >> crownfall_build_output/BUILD_STATUS.txt
+
+      - name: Publish fixed build outputs to branch
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -f crownfall_build_output
+          git commit -m 'Publish Crownfall v3 verified APK outputs' || true
+          git push origin HEAD:crownfall-apk-build-20260903
