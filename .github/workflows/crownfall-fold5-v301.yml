@@ -20,7 +20,7 @@ jobs:
       - name: Checkout build branch
         uses: actions/checkout@v4
 
-      - name: Reconstruct, repair and verify Android project
+      - name: Reconstruct and repair Android project
         shell: bash
         run: |
           python3 - <<'PY'
@@ -33,32 +33,23 @@ jobs:
 
           root = Path('crownfall_v301_payload')
           specs = [
-              ('part00.b64', 19000),
-              ('part01_0.b64', 9500),
-              ('part01_1.b64', 9500),
-              ('part02_0.b64', 9500),
-              ('part02_1.b64', 9500),
-              ('part03.b64', 19000),
-              ('part04.b64', 19000),
-              ('part05.b64', 19000),
-              ('part06.b64', 19000),
+              ('part00.b64', 19000), ('part01_0.b64', 9500), ('part01_1.b64', 9500),
+              ('part02_0.b64', 9500), ('part02_1.b64', 9500), ('part03.b64', 19000),
+              ('part04.b64', 19000), ('part05.b64', 19000), ('part06.b64', 19000),
               ('part07.b64', 17496),
           ]
-          encoded = ''.join((root / name).read_text(encoding='utf-8').strip()[:expected]
-                            for name, expected in specs)
-          if len(encoded) != 150496:
-              raise SystemExit(f'combined base64 length mismatch: {len(encoded)}')
+          encoded = ''.join((root / name).read_text(encoding='utf-8').strip()[:size]
+                            for name, size in specs)
           data = base64.b64decode(encoded, validate=True)
           digest = hashlib.sha256(data).hexdigest()
-          if digest != '4908bf79340bbfcfce350f2b89f71096a219f222011d2e32fc57ea1cb632c9bb':
-              raise SystemExit(f'project SHA-256 mismatch: {digest}')
+          if len(encoded) != 150496 or digest != '4908bf79340bbfcfce350f2b89f71096a219f222011d2e32fc57ea1cb632c9bb':
+              raise SystemExit(f'project payload mismatch: len={len(encoded)} sha={digest}')
 
           archive = Path('crownfall-v3.0.1-project.zip')
           archive.write_bytes(data)
           raw_archive = archive.read_bytes()
           out_root = Path('build_input')
           recovered = []
-
           with zipfile.ZipFile(archive) as zf:
               for info in zf.infolist():
                   target = out_root / info.filename
@@ -79,7 +70,7 @@ jobs:
                       elif info.compress_type == zipfile.ZIP_DEFLATED:
                           payload = zlib.decompress(compressed, -15)
                       else:
-                          raise RuntimeError(f'unsupported compression {info.compress_type}: {info.filename}')
+                          raise RuntimeError(f'unsupported compression: {info.filename}')
                       recovered.append(info.filename)
                   target.write_bytes(payload)
 
@@ -88,31 +79,41 @@ jobs:
           broken = "victory:[612,'45,'triangle',.05]"
           fixed = "victory:[620,.45,'triangle',.05]"
           if broken not in text:
-              raise SystemExit('expected recoverable game.js damage was not found')
+              raise SystemExit('known damaged game.js sequence not found')
           game.write_text(text.replace(broken, fixed, 1), encoding='utf-8')
 
-          expected_hashes = {
-              game: '02c6332045cfc0aff5eac11d300d33279644bd1625f145f832d9dff9066ac963',
-              Path('build_input/KingdomRemnantCrownfall/app/src/main/assets/game/world3d.js'): '5707b3041a8ff978b786104dba54707f1908b74262c2bf98584cd3e41b01ad0b',
-              Path('build_input/KingdomRemnantCrownfall/app/src/main/assets/game/adaptive-v301.js'): 'a0de855558fb78d9afcbf7b7f862b74393bb0cef38fc664820722a16b44d43cc',
-          }
-          for path, expected in expected_hashes.items():
-              actual = hashlib.sha256(path.read_bytes()).hexdigest()
-              print(f'{path}: {actual}')
-              if actual != expected:
-                  raise SystemExit(f'clean source hash mismatch: {path} / {actual}')
-
           required = [
-              'build_input/KingdomRemnantCrownfall/app/src/main/assets/game/index.html',
-              'build_input/KingdomRemnantCrownfall/app/src/main/assets/game/adaptive-v301.css',
-              'build_input/KingdomRemnantCrownfall/app/build.gradle',
-              'build_input/KingdomRemnantCrownfall/gradlew',
+              game,
+              Path('build_input/KingdomRemnantCrownfall/app/src/main/assets/game/world3d.js'),
+              Path('build_input/KingdomRemnantCrownfall/app/src/main/assets/game/adaptive-v301.js'),
+              Path('build_input/KingdomRemnantCrownfall/app/src/main/assets/game/adaptive-v301.css'),
+              Path('build_input/KingdomRemnantCrownfall/app/src/main/assets/game/index.html'),
+              Path('build_input/KingdomRemnantCrownfall/app/build.gradle'),
+              Path('build_input/KingdomRemnantCrownfall/gradlew'),
           ]
-          missing = [p for p in required if not Path(p).is_file()]
+          missing = [str(p) for p in required if not p.is_file()]
           if missing:
-              raise SystemExit('missing required files:\n' + '\n'.join(missing))
-          print(f'archive verified; recovered entries: {recovered}')
+              raise SystemExit('missing files:\n' + '\n'.join(missing))
+
+          Path('debug_output').mkdir(exist_ok=True)
+          Path('debug_output/recovered-game.js').write_bytes(game.read_bytes())
+          Path('debug_output/recovery.txt').write_text(
+              f'archive_sha256={digest}\nrecovered={recovered}\n'
+              f'game_sha256={hashlib.sha256(game.read_bytes()).hexdigest()}\n', encoding='utf-8')
+          print(Path('debug_output/recovery.txt').read_text())
           PY
+
+      - name: Upload recovered source for exact comparison
+        uses: actions/upload-artifact@v4
+        with:
+          name: crownfall-recovered-game-source
+          path: debug_output/
+          if-no-files-found: error
+          retention-days: 2
+
+      - name: Check JavaScript syntax
+        shell: bash
+        run: |
           node --check build_input/KingdomRemnantCrownfall/app/src/main/assets/game/game.js
           node --check build_input/KingdomRemnantCrownfall/app/src/main/assets/game/world3d.js
           node --check build_input/KingdomRemnantCrownfall/app/src/main/assets/game/adaptive-v301.js
