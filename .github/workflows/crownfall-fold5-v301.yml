@@ -82,16 +82,19 @@ jobs:
               "}, 112 + i * 250));": "}, 120 + i * 250));",
           }
           for broken, fixed in repairs.items():
-              count = text.count(broken)
-              if count != 1:
-                  raise SystemExit(f'unexpected damaged sequence count {count}: {broken}')
+              if text.count(broken) != 1:
+                  raise SystemExit(f'unexpected damaged sequence: {broken}')
               text = text.replace(broken, fixed, 1)
           game.write_text(text, encoding='utf-8')
+
+          adaptive = Path('build_input/KingdomRemnantCrownfall/app/src/main/assets/game/adaptive-v301.js')
+          clean_adaptive_b64 = 'KCgpID0+IHsKICAndXNlIHN0cmljdCc7CgogIGNvbnN0IHJvb3QgPSBkb2N1bWVudC5kb2N1bWVudEVsZW1lbnQ7CiAgY29uc3QgYm9keSA9IGRvY3VtZW50LmJvZHk7CiAgbGV0IHJlc2l6ZVRpbWVyID0gMDsKICBsZXQgbGFzdEtleSA9ICcnOwoKICBmdW5jdGlvbiB2aWV3cG9ydFNpemUoKSB7CiAgICBjb25zdCB2diA9IHdpbmRvdy52aXN1YWxWaWV3cG9ydDsKICAgIGNvbnN0IHdpZHRoID0gTWF0aC5tYXgoMSwgTWF0aC5yb3VuZCh2dj8ud2lkdGggfHwgd2luZG93LmlubmVyV2lkdGggfHwgcm9vdC5jbGllbnRXaWR0aCB8fCAxKSk7CiAgICBjb25zdCBoZWlnaHQgPSBNYXRoLm1heCgxLCBNYXRoLnJvdW5kKHZ2Py5oZWlnaHQgfHwgd2luZG93LmlubmVySGVpZ2h0IHx8IHJvb3QuY2xpZW50SGVpZ2h0IHx8IDEpKTsKICAgIHJldHVybiB7IHdpZHRoLCBoZWlnaHQgfTsKICB9CgogIGZ1bmN0aW9uIGNsYXNzaWZ5KCkgewogICAgY29uc3QgeyB3aWR0aCwgaGVpZ2h0IH0gPSB2aWV3cG9ydFNpemUoKTsKICAgIGNvbnN0IHNob3J0U2lkZSA9IE1hdGgubWluKHdpZHRoLCBoZWlnaHQpOwogICAgY29uc3QgbG9uZ1NpZGUgPSBNYXRoLm1heCh3aWR0aCwgaGVpZ2h0KTsKICAgIGNvbnN0IHJhdGlvID0gbG9uZ1NpZGUgLyBzaG9ydFNpZGU7CiAgICBjb25zdCBsYW5kc2NhcGUgPSB3aWR0aCA+PSBoZWlnaHQ7CgogICAgLyogRm9sZDUgdW5mb2xkZWQgV2ViVmlldyBpcyBuZWFyLXNxdWFyZSwgd2hpbGUgYSBub3JtYWwgcGhvbmUgaXMgdXN1YWxseSA+MS43OjEuICovCiAgICBjb25zdCBmb2xkT3BlbiA9IHNob3J0U2lkZSA+PSA2MDAgJiYgcmF0aW8gPD0gMS41ODsKICAgIGNvbnN0IGxhcmdlID0gc2hvcnRTaWRlID49IDYwMCB8fCAod2lkdGggPj0gMTEwMCAmJiBoZWlnaHQgPj0gNjUwKTsKICAgIGNvbnN0IGNvbXBhY3QgPSBzaG9ydFNpZGUgPCA0NzAgfHwgKGxhbmRzY2FwZSAmJiBoZWlnaHQgPCA1MjApOwogICAgY29uc3Qgd2lkZSA9IGxhbmRzY2FwZSAmJiByYXRpbyA+PSAxLjcyICYmIHdpZHRoID49IDEwMDA7CgogICAgY29uc3Qga2V5ID0gW3dpZHRoLCBoZWlnaHQsIGZvbGRPcGVuLCBsYXJnZSwgY29tcGFjdCwgd2lkZSwgbGFuZHNjYXBlXS5qb2luKCc6Jyk7CiAgICBpZiAoa2V5ID09PSBsYXN0S2V5KSByZXR1cm47CiAgICBsYXN0S2V5ID0ga2V5OwoKICAgIGJvZHkuY2xhc3NMaXN0LnRvZ2dsZSgndmlld3BvcnQtbGFuZHNjYXBlJywgbGFuZHNjYXBlKTsKICAgIGJvZHkuY2xhc3NMaXN0LnRvZ2dsZSgndmlld3BvcnQtcG9ydHJhaXQnLCAhbGFuZHNjYXBlKTsKICAgIGJvZHkuY2xhc3NMaXN0LnRvZ2dsZSgndmlld3BvcnQtZm9sZC1vcGVuJywgZm9sZE9wZW4pOwogICAgYm9keS5jbGFzc0xpc3QudG9nZ2xlKCd2aWV3cG9ydC1sYXJnZScsIGxhcmdlKTsKICAgIGJvZHkuY2xhc3NMaXN0LnRvZ2dsZSgndmlld3BvcnQtY29tcGFjdCcsIGNvbXBhY3QpOwogICAgYm9keS5jbGFzc0xpc3QudG9nZ2xlKCd2aWV3cG9ydC13aWRlJywgd2lkZSk7CiAgICBib2R5LmRhdGFzZXQudmlld3BvcnRNb2RlID0gZm9sZE9wZW4gPyAnZm9sZC1vcGVuJyA6IGxhcmdlID8gJ2xhcmdlJyA6IGNvbXBhY3QgPyAnY29tcGFjdCcgOiAncGhvbmUnOwoKICAgIHJvb3Quc3R5bGUuc2V0UHJvcGVydHkoJy0tdmlld3BvcnQtdycsIGAke3dpZHRofXB4YCk7CiAgICByb290LnN0eWxlLnNldFByb3BlcnR5KCctLXZpZXdwb3J0LWgnLCBgJHtoZWlnaHR9cHhgKTsKICAgIHJvb3Quc3R5bGUuc2V0UHJvcGVydHkoJy0tYWRhcHRpdmUtdW5pdCcsIGAke01hdGgubWF4KC43LCBNYXRoLm1pbigxLjM1LCBzaG9ydFNpZGUgLyA3MjApKS50b0ZpeGVkKDMpfXB4YCk7CgogICAgY29uc3QgY2FudmFzID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2dhbWVDYW52YXMnKTsKICAgIGNvbnN0IHVpQ2FudmFzID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3VpQ2FudmFzJyk7CiAgICBmb3IgKGNvbnN0IG5vZGUgb2YgW2NhbnZhcywgdWlDYW52YXNdKSB7CiAgICAgIGlmICghbm9kZSkgY29udGludWU7CiAgICAgIG5vZGUuc3R5bGUud2lkdGggPSBgJHt3aWR0aH1weGA7CiAgICAgIG5vZGUuc3R5bGUuaGVpZ2h0ID0gYCR7aGVpZ2h0fXB4YDsKICAgIH0KCiAgICB3aW5kb3cuZGlzcGF0Y2hFdmVudChuZXcgQ3VzdG9tRXZlbnQoJ2Nyb3duZmFsbHZpZXdwb3J0Y2hhbmdlJywgewogICAgICBkZXRhaWw6IHsgd2lkdGgsIGhlaWdodCwgc2hvcnRTaWRlLCBsb25nU2lkZSwgcmF0aW8sIGxhbmRzY2FwZSwgZm9sZE9wZW4sIGxhcmdlLCBjb21wYWN0LCB3aWRlIH0KICAgIH0pKTsKICB9CgogIGZ1bmN0aW9uIHNjaGVkdWxlKCkgewogICAgY2xlYXJUaW1lb3V0KHJlc2l6ZVRpbWVyKTsKICAgIHJlc2l6ZVRpbWVyID0gd2luZG93LnNldFRpbWVvdXQoKCkgPT4gewogICAgICBjbGFzc2lmeSgpOwogICAgICByZXF1ZXN0QW5pbWF0aW9uRnJhbWUoY2xhc3NpZnkpOwogICAgICB3aW5kb3cuc2V0VGltZW91dChjbGFzc2lmeSwgMjQwKTsKICAgIH0sIDQwKTsKICB9CgogIHdpbmRvdy5Dcm93bmZhbGxWaWV3cG9ydCA9IHsKICAgIHJlZnJlc2g6IHNjaGVkdWxlLAogICAgZ2V0IG1vZGUoKSB7IHJldHVybiBib2R5LmRhdGFzZXQudmlld3BvcnRNb2RlIHx8ICd1bmtub3duJzsgfQogIH07CgogIHdpbmRvdy5hZGRFdmVudExpc3RlbmVyKCdyZXNpemUnLCBzY2hlZHVsZSwgeyBwYXNzaXZlOiB0cnVlIH0pOwogIHdpbmRvdy5hZGRFdmVudExpc3RlbmVyKCdvcmllbnRhdGlvbmNoYW5nZScsIHNjaGVkdWxlLCB7IHBhc3NpdmU6IHRydWUgfSk7CiAgd2luZG93LmFkZEV2ZW50TGlzdGVuZXIoJ3BhZ2VzaG93Jywgc2NoZWR1bGUsIHsgcGFzc2l2ZTogdHJ1ZSB9KTsKICB3aW5kb3cudmlzdWFsVmlld3BvcnQ/LmFkZEV2ZW50TGlzdGVuZXIoJ3Jlc2l6ZScsIHNjaGVkdWxlLCB7IHBhc3NpdmU6IHRydWUgfSk7CiAgd2luZG93LnZpc3VhbFZpZXdwb3J0Py5hZGRFdmVudExpc3RlbmVyKCdzY3JvbGwnLCBzY2hlZHVsZSwgeyBwYXNzaXZlOiB0cnVlIH0pOwoKICBpZiAoJ1Jlc2l6ZU9ic2VydmVyJyBpbiB3aW5kb3cpIHsKICAgIG5ldyBSZXNpemVPYnNlcnZlcihzY2hlZHVsZSkub2JzZXJ2ZShyb290KTsKICB9CgogIGNsYXNzaWZ5KCk7CiAgZG9jdW1lbnQuYWRkRXZlbnRMaXN0ZW5lcignRE9NQ29udGVudExvYWRlZCcsIHNjaGVkdWxlLCB7IG9uY2U6IHRydWUgfSk7Cn0pKCk7Cg=='
+          adaptive.write_bytes(base64.b64decode(clean_adaptive_b64, validate=True))
 
           expected_hashes = {
               game: '02c6332045cfc0aff5eac11d300d33279644bd1625f145f832d9dff9066ac963',
               Path('build_input/KingdomRemnantCrownfall/app/src/main/assets/game/world3d.js'): '5707b3041a8ff978b786104dba54707f1908b74262c2bf98584cd3e41b01ad0b',
-              Path('build_input/KingdomRemnantCrownfall/app/src/main/assets/game/adaptive-v301.js'): 'a0de855558fb78d9afcbf7b7f862b74393bb0cef38fc664820722a16b44d43cc',
+              adaptive: 'a0de855558fb78d9afcbf7b7f862b74393bb0cef38fc664820722a16b44d43cc',
           }
           for path, expected in expected_hashes.items():
               actual = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -108,7 +111,7 @@ jobs:
           missing = [str(p) for p in required if not p.is_file()]
           if missing:
               raise SystemExit('missing files:\n' + '\n'.join(missing))
-          print(f'project repaired exactly; recovered ZIP entries: {recovered}')
+          print(f'project repaired; recovered ZIP entries: {recovered}')
           PY
           node --check build_input/KingdomRemnantCrownfall/app/src/main/assets/game/game.js
           node --check build_input/KingdomRemnantCrownfall/app/src/main/assets/game/world3d.js
