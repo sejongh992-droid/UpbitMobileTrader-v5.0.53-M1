@@ -1,0 +1,233 @@
+name: Build Final Crownfall Fold5 APKs
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - crownfall-fold5-v301
+    paths:
+      - .github/workflows/crownfall-fold5-final.yml
+      - crownfall_v301_overrides/**
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout build branch
+        uses: actions/checkout@v4
+
+      - name: Reconstruct and repair Android project
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64
+          import hashlib
+          import struct
+          import zipfile
+          import zlib
+          from pathlib import Path
+
+          root = Path('crownfall_v301_payload')
+          specs = [
+              ('part00.b64', 19000),
+              ('part01_0.b64', 9500),
+              ('part01_1.b64', 9500),
+              ('part02_0.b64', 9500),
+              ('part02_1.b64', 9500),
+              ('part03.b64', 19000),
+              ('part04.b64', 19000),
+              ('part05.b64', 19000),
+              ('part06.b64', 19000),
+              ('part07.b64', 17496),
+          ]
+
+          chunks = []
+          for name, expected in specs:
+              value = (root / name).read_text(encoding='utf-8').strip()
+              if len(value) < expected:
+                  raise SystemExit(f'{name}: too short ({len(value)} < {expected})')
+              chunks.append(value[:expected])
+
+          encoded = ''.join(chunks)
+          if len(encoded) != 150496:
+              raise SystemExit(f'combined Base64 length mismatch: {len(encoded)}')
+
+          archive_bytes = base64.b64decode(encoded, validate=True)
+          archive_sha = hashlib.sha256(archive_bytes).hexdigest()
+          expected_archive_sha = '4908bf79340bbfcfce350f2b89f71096a219f222011d2e32fc57ea1cb632c9bb'
+          if archive_sha != expected_archive_sha:
+              raise SystemExit(f'project archive SHA-256 mismatch: {archive_sha}')
+
+          archive_path = Path('crownfall-v3.0.1-project.zip')
+          archive_path.write_bytes(archive_bytes)
+          raw = archive_path.read_bytes()
+          output_root = Path('build_input')
+          recovered_entries = []
+
+          with zipfile.ZipFile(archive_path) as zf:
+              for info in zf.infolist():
+                  target = output_root / info.filename
+                  if info.is_dir():
+                      target.mkdir(parents=True, exist_ok=True)
+                      continue
+
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  try:
+                      payload = zf.read(info)
+                  except zipfile.BadZipFile:
+                      offset = info.header_offset
+                      fields = struct.unpack_from('<IHHHHHIIIHH', raw, offset)
+                      name_length, extra_length = fields[-2], fields[-1]
+                      start = offset + 30 + name_length + extra_length
+                      compressed = raw[start:start + info.compress_size]
+                      if info.compress_type == zipfile.ZIP_STORED:
+                          payload = compressed
+                      elif info.compress_type == zipfile.ZIP_DEFLATED:
+                          payload = zlib.decompress(compressed, -15)
+                      else:
+                          raise RuntimeError(
+                              f'unsupported compression method {info.compress_type}: {info.filename}'
+                          )
+                      recovered_entries.append(info.filename)
+                  target.write_bytes(payload)
+
+          project = output_root / 'KingdomRemnantCrownfall'
+          game = project / 'app/src/main/assets/game/game.js'
+          game_text = game.read_text(encoding='utf-8')
+          repairs = {
+              "victory:[612,'45,'triangle',.05]": "victory:[620,.45,'triangle',.05]",
+              "enhanceFail:[112,'28,'sawtooth',.035]": "enhanceFail:[120,.28,'sawtooth',.035]",
+              "}, 112 + i * 250));": "}, 120 + i * 250));",
+          }
+          for damaged, clean in repairs.items():
+              count = game_text.count(damaged)
+              if count != 1:
+                  raise SystemExit(f'unexpected repair count {count}: {damaged}')
+              game_text = game_text.replace(damaged, clean, 1)
+          game.write_text(game_text, encoding='utf-8')
+
+          adaptive_override = Path('crownfall_v301_overrides/adaptive-v301.js')
+          icon_override = Path('crownfall_v301_overrides/ic_launcher_foreground.xml')
+          adaptive_target = project / 'app/src/main/assets/game/adaptive-v301.js'
+          icon_target = project / 'app/src/main/res/drawable/ic_launcher_foreground.xml'
+          adaptive_target.write_bytes(adaptive_override.read_bytes())
+          icon_target.write_bytes(icon_override.read_bytes())
+
+          expected_hashes = {
+              game: '02c6332045cfc0aff5eac11d300d33279644bd1625f145f832d9dff9066ac963',
+              project / 'app/src/main/assets/game/world3d.js': '5707b3041a8ff978b786104dba54707f1908b74262c2bf98584cd3e41b01ad0b',
+              adaptive_target: 'a0de855558fb78d9afcbf7b7f862b74393bb0cef38fc664820722a16b44d43cc',
+              project / 'app/src/main/assets/game/adaptive-v301.css': '5f6641aabbcbffcd970cb87ea3cf0d18b31796a644e3a375f8ac62c6969a040e',
+              project / 'app/src/main/assets/game/index.html': 'ed56ce5ad03b73dfcc806116cd0e00c0048d1482cf39719c951c601e329d9bfc',
+          }
+          for path, expected in expected_hashes.items():
+              actual = hashlib.sha256(path.read_bytes()).hexdigest()
+              print(f'{path}: {actual}')
+              if actual != expected:
+                  raise SystemExit(f'clean source hash mismatch: {path} / {actual}')
+
+          required = [
+              project / 'settings.gradle',
+              project / 'build.gradle',
+              project / 'gradle.properties',
+              project / 'gradlew',
+              project / 'app/build.gradle',
+              project / 'app/src/main/AndroidManifest.xml',
+              project / 'app/src/main/java/com/sejong/kingdomremnant/MainActivity.java',
+              project / 'app/src/owner/AndroidManifest.xml',
+              project / 'app/src/store/AndroidManifest.xml',
+              icon_target,
+          ]
+          missing = [str(path) for path in required if not path.is_file()]
+          if missing:
+              raise SystemExit('missing required files:\n' + '\n'.join(missing))
+
+          icon_text = icon_target.read_text(encoding='utf-8')
+          if '<vector' not in icon_text or 'strokeWidth' in icon_text:
+              raise SystemExit('launcher icon override is not the clean vector version')
+
+          print(f'archive verified: {len(archive_bytes)} bytes / {archive_sha}')
+          print(f'recovered CRC-damaged entries: {recovered_entries}')
+          PY
+
+      - name: Verify JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check build_input/KingdomRemnantCrownfall/app/src/main/assets/game/game.js
+          node --check build_input/KingdomRemnantCrownfall/app/src/main/assets/game/world3d.js
+          node --check build_input/KingdomRemnantCrownfall/app/src/main/assets/game/adaptive-v301.js
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android API 36 build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager 'platform-tools' 'platforms;android-36' 'build-tools;36.0.0'
+
+      - name: Build OWNER and STORE APKs
+        working-directory: build_input/KingdomRemnantCrownfall
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon --stacktrace :app:assembleOwnerDebug :app:assembleStoreDebug
+
+      - name: Verify APK signatures and bundled game
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROJECT='build_input/KingdomRemnantCrownfall'
+          mkdir -p output
+
+          OWNER_APK=$(find "$PROJECT/app/build/outputs/apk" -type f -iname '*owner*debug*.apk' | head -n 1)
+          STORE_APK=$(find "$PROJECT/app/build/outputs/apk" -type f -iname '*store*debug*.apk' | head -n 1)
+          test -n "$OWNER_APK" && test -f "$OWNER_APK"
+          test -n "$STORE_APK" && test -f "$STORE_APK"
+
+          cp "$OWNER_APK" output/KingdomRemnant-Crownfall-v3.0.1-Fold5-OWNER.apk
+          cp "$STORE_APK" output/KingdomRemnant-Crownfall-v3.0.1-Fold5-STORE.apk
+
+          APKSIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          : > output/BUILD_REPORT.txt
+
+          for APK in output/*.apk; do
+            echo "===== $APK =====" | tee -a output/BUILD_REPORT.txt
+            unzip -t "$APK" | tail -n 2 | tee -a output/BUILD_REPORT.txt
+            "$APKSIGNER" verify --verbose --print-certs "$APK" | tee -a output/BUILD_REPORT.txt
+            "$AAPT" dump badging "$APK" | head -n 8 | tee -a output/BUILD_REPORT.txt
+            unzip -l "$APK" | grep -E \
+              'classes.dex|assets/game/index.html|assets/game/game.js|assets/game/world3d.js|assets/game/adaptive-v301.css|assets/game/adaptive-v301.js' \
+              | tee -a output/BUILD_REPORT.txt
+          done
+
+          sha256sum output/*.apk | tee output/SHA256.txt
+          (cd output && zip -9 Crownfall-v3.0.1-Fold5-APK-2PACK.zip \
+            KingdomRemnant-Crownfall-v3.0.1-Fold5-OWNER.apk \
+            KingdomRemnant-Crownfall-v3.0.1-Fold5-STORE.apk \
+            BUILD_REPORT.txt SHA256.txt)
+          ls -lh output
+
+      - name: Upload verified APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: crownfall-v3.0.1-fold5-final-apks
+          path: output/
+          if-no-files-found: error
+          retention-days: 7
