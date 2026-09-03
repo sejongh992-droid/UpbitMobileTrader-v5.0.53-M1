@@ -20,7 +20,7 @@ jobs:
       - name: Checkout build branch
         uses: actions/checkout@v4
 
-      - name: Reconstruct and repair Android project
+      - name: Reconstruct, repair and verify Android project
         shell: bash
         run: |
           python3 - <<'PY'
@@ -76,44 +76,40 @@ jobs:
 
           game = Path('build_input/KingdomRemnantCrownfall/app/src/main/assets/game/game.js')
           text = game.read_text(encoding='utf-8')
-          broken = "victory:[612,'45,'triangle',.05]"
-          fixed = "victory:[620,.45,'triangle',.05]"
-          if broken not in text:
-              raise SystemExit('known damaged game.js sequence not found')
-          game.write_text(text.replace(broken, fixed, 1), encoding='utf-8')
+          repairs = {
+              "victory:[612,'45,'triangle',.05]": "victory:[620,.45,'triangle',.05]",
+              "enhanceFail:[112,'28,'sawtooth',.035]": "enhanceFail:[120,.28,'sawtooth',.035]",
+              "}, 112 + i * 250));": "}, 120 + i * 250));",
+          }
+          for broken, fixed in repairs.items():
+              count = text.count(broken)
+              if count != 1:
+                  raise SystemExit(f'unexpected damaged sequence count {count}: {broken}')
+              text = text.replace(broken, fixed, 1)
+          game.write_text(text, encoding='utf-8')
+
+          expected_hashes = {
+              game: '02c6332045cfc0aff5eac11d300d33279644bd1625f145f832d9dff9066ac963',
+              Path('build_input/KingdomRemnantCrownfall/app/src/main/assets/game/world3d.js'): '5707b3041a8ff978b786104dba54707f1908b74262c2bf98584cd3e41b01ad0b',
+              Path('build_input/KingdomRemnantCrownfall/app/src/main/assets/game/adaptive-v301.js'): 'a0de855558fb78d9afcbf7b7f862b74393bb0cef38fc664820722a16b44d43cc',
+          }
+          for path, expected in expected_hashes.items():
+              actual = hashlib.sha256(path.read_bytes()).hexdigest()
+              print(f'{path}: {actual}')
+              if actual != expected:
+                  raise SystemExit(f'clean source hash mismatch: {path} / {actual}')
 
           required = [
-              game,
-              Path('build_input/KingdomRemnantCrownfall/app/src/main/assets/game/world3d.js'),
-              Path('build_input/KingdomRemnantCrownfall/app/src/main/assets/game/adaptive-v301.js'),
-              Path('build_input/KingdomRemnantCrownfall/app/src/main/assets/game/adaptive-v301.css'),
               Path('build_input/KingdomRemnantCrownfall/app/src/main/assets/game/index.html'),
+              Path('build_input/KingdomRemnantCrownfall/app/src/main/assets/game/adaptive-v301.css'),
               Path('build_input/KingdomRemnantCrownfall/app/build.gradle'),
               Path('build_input/KingdomRemnantCrownfall/gradlew'),
           ]
           missing = [str(p) for p in required if not p.is_file()]
           if missing:
               raise SystemExit('missing files:\n' + '\n'.join(missing))
-
-          Path('debug_output').mkdir(exist_ok=True)
-          Path('debug_output/recovered-game.js').write_bytes(game.read_bytes())
-          Path('debug_output/recovery.txt').write_text(
-              f'archive_sha256={digest}\nrecovered={recovered}\n'
-              f'game_sha256={hashlib.sha256(game.read_bytes()).hexdigest()}\n', encoding='utf-8')
-          print(Path('debug_output/recovery.txt').read_text())
+          print(f'project repaired exactly; recovered ZIP entries: {recovered}')
           PY
-
-      - name: Upload recovered source for exact comparison
-        uses: actions/upload-artifact@v4
-        with:
-          name: crownfall-recovered-game-source
-          path: debug_output/
-          if-no-files-found: error
-          retention-days: 2
-
-      - name: Check JavaScript syntax
-        shell: bash
-        run: |
           node --check build_input/KingdomRemnantCrownfall/app/src/main/assets/game/game.js
           node --check build_input/KingdomRemnantCrownfall/app/src/main/assets/game/world3d.js
           node --check build_input/KingdomRemnantCrownfall/app/src/main/assets/game/adaptive-v301.js
