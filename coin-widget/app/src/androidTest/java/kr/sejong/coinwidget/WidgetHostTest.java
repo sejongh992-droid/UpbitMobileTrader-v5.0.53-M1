@@ -45,6 +45,7 @@ public class WidgetHostTest {
    SystemClock.sleep(1200);Repository.RUNNING.set(false);
    c.getSharedPreferences("settings",0).edit().putBoolean("auto",true).commit();Scheduler.ensure(c);MarketWidget.renderAll(c);ins.waitForIdleSync();SystemClock.sleep(700);
    JobInfo job=c.getSystemService(JobScheduler.class).getPendingJob(Scheduler.PERIODIC);assertNotNull(job);assertEquals(900_000L,job.getIntervalMillis());assertTrue(job.isPersisted());
+   JobInfo morning=c.getSystemService(JobScheduler.class).getPendingJob(Scheduler.MORNING);assertNotNull(morning);assertTrue(morning.isPersisted());assertTrue(morning.getExtras().getLong("at")>System.currentTimeMillis());
    scenario.onActivity(a->{assertNotNull("Framework widget failed to inflate",view.get().findViewById(R.id.refresh));assertEquals(View.VISIBLE,view.get().findViewById(R.id.dom_group).getVisibility());});screenshot("synthetic-widget-full.png");
    options.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,340);m.updateAppWidgetOptions(id,options);MarketWidget.renderAll(c);ins.waitForIdleSync();SystemClock.sleep(700);
    scenario.onActivity(a->{assertEquals(View.GONE,view.get().findViewById(R.id.dom_group).getVisibility());assertNotNull(view.get().findViewById(R.id.refresh));});

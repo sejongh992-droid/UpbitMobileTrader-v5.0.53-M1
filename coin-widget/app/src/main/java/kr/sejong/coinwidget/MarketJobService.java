@@ -10,15 +10,14 @@ public final class MarketJobService extends JobService {
     private static final class Run {volatile Future<?>future;}
     @Override public boolean onStartJob(JobParameters params){
         if(params.getJobId()==Scheduler.EXPIRE){MarketWidget.renderAll(this);return false;}
-        if(params.getJobId()==Scheduler.MORNING)new Handler(Looper.getMainLooper()).postDelayed(()->Scheduler.scheduleMorning(this),1000);
-        if(Repository.RUNNING.get())return false;
+        if(Repository.RUNNING.get()){if(params.getJobId()==Scheduler.MORNING)new Handler(Looper.getMainLooper()).post(()->Scheduler.scheduleMorning(this));return false;}
         Run run=new Run();runs.put(params.getJobId(),run);
         run.future=executor.submit(()->{
             boolean retry=false;
             try{retry=!Repository.refresh(getApplicationContext());}
             catch(Exception e){if(!Thread.currentThread().isInterrupted()){Repository.recordFailure(this,"자동 조회 처리 실패: 다음 연결에서 재시도");retry=true;}}
             final boolean again=retry;
-            new Handler(Looper.getMainLooper()).post(()->{if(runs.remove(params.getJobId(),run))jobFinished(params,again);});
+            new Handler(Looper.getMainLooper()).post(()->{if(runs.remove(params.getJobId(),run)){boolean morning=params.getJobId()==Scheduler.MORNING;jobFinished(params,morning?false:again);if(morning)Scheduler.scheduleMorning(this);}});
         });
         return true;
     }
