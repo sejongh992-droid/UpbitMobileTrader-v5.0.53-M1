@@ -58,6 +58,7 @@ final class Dashboard {
  static RemoteViews build(Context c,int width,int height,int id){
   long now=System.currentTimeMillis();int mode=mode(c,id),screen=screen(c,id);JSONObject root=Repository.load(c),m=Renderer.obj(root,"market"),btc=Renderer.obj(m,"btc"),t=Renderer.obj(m,"btc_technical"),dom=Renderer.obj(root,"dominance"),fx=Renderer.obj(root,"fx");
   RemoteViews v=new RemoteViews(c.getPackageName(),R.layout.widget_v120);
+  v.setTextViewTextSize(R.id.detail_text,TypedValue.COMPLEX_UNIT_SP,screen==SETTINGS?14:15);
   v.setTextViewText(R.id.fx,FxData.header(root,now));
   int[]tabs={R.id.tab_today,R.id.tab_morning,R.id.tab_long};int[]actions={0,1,LONG};
   for(int j=0;j<tabs.length;j++){v.setTextColor(tabs[j],mode==j?PURPLE:MUTED);v.setInt(tabs[j],"setBackgroundResource",mode==j?R.drawable.tab_selected:R.drawable.tab_idle);v.setOnClickPendingIntent(tabs[j],nav(c,id,actions[j]));}

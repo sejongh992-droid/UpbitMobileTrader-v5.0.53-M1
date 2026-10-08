@@ -39,8 +39,9 @@ public class RepairRegressionTest {
   try{FxData.parse(raw.put("rate",0),now);fail("Invalid rate accepted");}catch(java.io.IOException expected){}
  }
  @Test public void toolbarLabelsAndActionsAreFixed()throws Exception{
+  // Already-list screens need no queued BACK; otherwise it can arrive after direct test setup of the next screen.
   store(seed());for(int action:new int[]{0,1,Dashboard.LONG,Dashboard.MARKET,Dashboard.SETTINGS,Dashboard.COIN}){
-   Dashboard.move(c,923,action,"KRW-LPT");ins.runOnMainSync(()->{View v=Dashboard.build(c,340,760,923).apply(c,new FrameLayout(c));assertEquals("목록",((TextView)v.findViewById(R.id.list_home)).getText().toString());assertEquals("시장",((TextView)v.findViewById(R.id.market_home)).getText().toString());assertEquals("설정",((TextView)v.findViewById(R.id.open_app)).getText().toString());assertFalse(v.findViewById(R.id.page_label).hasOnClickListeners());if(action==Dashboard.SETTINGS){assertEquals(View.GONE,v.findViewById(R.id.page_controls).getVisibility());assertEquals(1,Dashboard.prefs(c).getInt("pages923",0));}assertTrue(v.findViewById(R.id.list_home).performClick());});
+   Dashboard.move(c,923,action,"KRW-LPT");ins.runOnMainSync(()->{View v=Dashboard.build(c,340,760,923).apply(c,new FrameLayout(c));assertEquals("목록",((TextView)v.findViewById(R.id.list_home)).getText().toString());assertEquals("시장",((TextView)v.findViewById(R.id.market_home)).getText().toString());assertEquals("설정",((TextView)v.findViewById(R.id.open_app)).getText().toString());assertFalse(v.findViewById(R.id.page_label).hasOnClickListeners());if(action==Dashboard.SETTINGS){assertEquals(View.GONE,v.findViewById(R.id.page_controls).getVisibility());assertEquals(1,Dashboard.prefs(c).getInt("pages923",0));}assertTrue(v.findViewById(R.id.list_home).hasOnClickListeners());if(action==Dashboard.MARKET||action==Dashboard.SETTINGS||action==Dashboard.COIN)assertTrue(v.findViewById(R.id.list_home).performClick());});
    long end=android.os.SystemClock.elapsedRealtime()+3000;while(Dashboard.screen(c,923)!=0&&android.os.SystemClock.elapsedRealtime()<end)android.os.SystemClock.sleep(20);assertEquals(0,Dashboard.screen(c,923));
   }
  }
