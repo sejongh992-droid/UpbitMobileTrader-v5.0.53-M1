@@ -1,5 +1,6 @@
 package kr.sejong.coinwidget;
 import android.app.Instrumentation;
+import android.app.AlertDialog;
 import android.app.job.*;
 import android.appwidget.*;
 import android.content.*;
@@ -50,12 +51,25 @@ public class WidgetHostTest {
    c.getSharedPreferences("settings",0).edit().putBoolean("auto",false).commit();Scheduler.ensure(c);assertNull(c.getSystemService(JobScheduler.class).getPendingJob(Scheduler.PERIODIC));
   }finally{Repository.RUNNING.set(false);host.stopListening();host.deleteHost();Scheduler.cancel(c);if(scenario!=null)scenario.close();ins.getUiAutomation().dropShellPermissionIdentity();}
  }
+ private static <T extends View>T find(View root,Class<T>type){
+  if(type.isInstance(root))return type.cast(root);
+  if(root instanceof ViewGroup){ViewGroup group=(ViewGroup)root;for(int i=0;i<group.getChildCount();i++){T found=find(group.getChildAt(i),type);if(found!=null)return found;}}
+  return null;
+ }
  @Test public void activityAndSettingsOpen()throws Exception{
-  fixture();try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
-   scenario.onActivity(a->{assertNotNull(a.findViewById(R.id.refresh));SettingsUi.show(a);});ins.waitForIdleSync();SystemClock.sleep(400);
-   assertNotNull(ins.getUiAutomation().getRootInActiveWindow());
-   assertFalse(ins.getUiAutomation().getRootInActiveWindow().findAccessibilityNodeInfosByText("2시간 주기 자동 갱신").isEmpty());
-   ins.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);
-  }
+  fixture();Repository.RUNNING.set(true);
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(a->{
+    assertNotNull(a.findViewById(R.id.refresh));AlertDialog dialog=SettingsUi.show(a);
+    assertTrue("Settings dialog must be shown",dialog.isShowing());assertNotNull(dialog.getWindow());
+    assertTrue("Keep key-entry window protected",(dialog.getWindow().getAttributes().flags&WindowManager.LayoutParams.FLAG_SECURE)!=0);
+    CheckBox auto=find(dialog.getWindow().getDecorView(),CheckBox.class);assertNotNull("Automatic refresh checkbox missing",auto);assertEquals("2시간 주기 자동 갱신",auto.getText().toString());assertFalse(auto.isChecked());
+    EditText key=find(dialog.getWindow().getDecorView(),EditText.class);assertNotNull("API input missing",key);assertEquals(android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD,key.getInputType()&android.text.InputType.TYPE_MASK_VARIATION);
+    auto.setChecked(true);dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
+    assertTrue("Save must persist auto setting",a.getSharedPreferences("settings",0).getBoolean("auto",false));assertFalse("Save must close the dialog",dialog.isShowing());
+    assertEquals("CoinPaprika",a.getSharedPreferences("settings",0).getString("dominance_source",""));
+    assertEquals("Secure flag must clear after close",0,a.getWindow().getAttributes().flags&WindowManager.LayoutParams.FLAG_SECURE);
+   });
+  }finally{Repository.RUNNING.set(false);Scheduler.cancel(c);}
  }
 }

@@ -5,7 +5,7 @@ import android.text.InputType;
 import android.view.*;
 import android.widget.*;
 final class SettingsUi {
- static void show(MainActivity a){
+ static AlertDialog show(MainActivity a){
   a.getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
   SharedPreferences pref=a.getSharedPreferences("settings",0);
   LinearLayout body=new LinearLayout(a);body.setOrientation(LinearLayout.VERTICAL);body.setPadding(a.dp(18),a.dp(8),a.dp(18),a.dp(8));
@@ -32,6 +32,6 @@ final class SettingsUi {
     }catch(Exception e){key.setError("키 형식 또는 암호화 저장을 확인하세요.");}
    });
    dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v->{SecureStore.clear(a);pref.edit().putString("dominance_source","CoinPaprika").apply();dialog.dismiss();a.toast("저장 키를 삭제하고 기본 공급원으로 변경했습니다.");a.draw();a.refresh();});
-  });dialog.show();
+  });dialog.show();return dialog;
  }
 }
