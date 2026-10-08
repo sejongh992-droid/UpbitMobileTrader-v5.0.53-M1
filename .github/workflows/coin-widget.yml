@@ -1,0 +1,100 @@
+name: Coin widget APK and Android checks
+on:
+  push:
+    branches: [coin-widget-build]
+    paths:
+      - 'coin-widget/BUILD_READY'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: coin-widget-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: SDK packages
+        run: sdkmanager 'platforms;android-35' 'build-tools;34.0.0'
+      - name: Source checks
+        working-directory: coin-widget
+        run: bash tests/run_tests.sh
+      - name: Compile release and Android tests; lint
+        working-directory: coin-widget
+        run: gradle --no-daemon :app:assembleRelease :app:assembleReleaseAndroidTest :app:lintRelease
+      - name: Verify and collect APK
+        working-directory: coin-widget
+        run: |
+          mkdir -p delivery
+          cp app/build/outputs/apk/release/app-release.apk delivery/CoinMarketWidget-1.0.1-ci.apk
+          cp app/build/outputs/apk/androidTest/release/app-release-androidTest.apk delivery/tests.apk
+          cp "$ANDROID_HOME/build-tools/34.0.0/lib/apksigner.jar" delivery/apksigner.jar
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose --print-certs delivery/CoinMarketWidget-1.0.1-ci.apk | tee delivery/signature-ci.txt
+          "$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging delivery/CoinMarketWidget-1.0.1-ci.apk > delivery/apk-badging.txt
+          unzip -t delivery/CoinMarketWidget-1.0.1-ci.apk
+          sha256sum delivery/*.apk delivery/apksigner.jar > delivery/SHA256SUMS.txt
+      - name: Upload installable build and test tools
+        uses: actions/upload-artifact@v4
+        with:
+          name: CoinMarketWidget-build
+          path: coin-widget/delivery/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CoinMarketWidget-lint
+          path: coin-widget/app/build/reports/
+          retention-days: 14
+  device:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [34, 36]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/download-artifact@v4
+        with:
+          name: CoinMarketWidget-build
+          path: delivery
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install APK and run device tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none -camera-front none
+          script: bash coin-widget/tests/device_checks.sh
+      - name: Upload device logs and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CoinMarketWidget-device-API${{ matrix.api }}
+          path: device-results/
+          if-no-files-found: warn
+          retention-days: 14
