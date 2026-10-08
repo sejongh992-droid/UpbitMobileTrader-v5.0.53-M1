@@ -63,7 +63,7 @@ final class Dashboard {
   for(int j=0;j<tabs.length;j++){v.setTextColor(tabs[j],mode==j?PURPLE:MUTED);v.setInt(tabs[j],"setBackgroundResource",mode==j?R.drawable.tab_selected:R.drawable.tab_idle);v.setOnClickPendingIntent(tabs[j],nav(c,id,actions[j]));}
   visible(v,R.id.market_panel,screen==MARKET);visible(v,R.id.recommendations,screen==0);visible(v,R.id.detail_panel,screen!=0&&screen!=MARKET);
   boolean fresh=freshRecommendation(root,mode,now);JSONArray items=list(m,mode);
-  int pages=1,page=0;v.setOnClickPendingIntent(R.id.page_label,null);
+  int pages=1,page=0;v.setOnClickPendingIntent(R.id.page_label,null);visible(v,R.id.page_controls,screen!=SETTINGS);
   if(screen==0){
    int count=rows(c,height);pages=Math.max(1,(items.length()+count-1)/count);page=Math.floorMod(prefs(c).getInt("page"+id,0),pages);
    visible(v,R.id.breadth,bodyHeight(height)>=250);v.setTextViewText(R.id.breadth,summary(m));
@@ -97,12 +97,12 @@ final class Dashboard {
    v.setOnClickPendingIntent(R.id.btc_chart,nav(c,id,BTC));v.setOnClickPendingIntent(R.id.dom_group,nav(c,id,DOM));
    v.setTextViewText(R.id.page_label,"차트 눌러 확대");
   }else{
-   DetailContent.Result d=DetailContent.forScreen(c,id,screen,root,mode,now);v.setTextViewText(R.id.detail_title,d.title);v.setTextViewText(R.id.detail_price,d.price);visible(v,R.id.detail_price,!d.price.isEmpty());
+   DetailContent.Result d=DetailContent.forScreen(c,id,screen,root,mode,now);if(screen==SETTINGS)d.text=FxData.settings(root,now,height<600);v.setTextViewText(R.id.detail_title,d.title);v.setTextViewText(R.id.detail_price,d.price);visible(v,R.id.detail_price,!d.price.isEmpty());
    visible(v,R.id.detail_action,screen==SETTINGS);v.setTextViewText(R.id.detail_action,c.getSharedPreferences("settings",0).getBoolean("auto",true)?"자동 조회 켜짐 · 누르면 끄기":"자동 조회 꺼짐 · 누르면 켜기");v.setOnClickPendingIntent(R.id.detail_action,nav(c,id,AUTO));
    if(d.chart!=null&&height>=480){visible(v,R.id.detail_chart,true);v.setImageViewBitmap(R.id.detail_chart,d.chart);visible(v,R.id.detail_text,false);visible(v,R.id.chart_caption,true);v.setTextViewText(R.id.chart_caption,d.text);}
    else{
-    int available=bodyHeight(height)-32-(d.price.isEmpty()?0:36)-(screen==SETTINGS?52:0);
-    List<String>chunks=split(c,d.text,Math.max(160,width-20),Math.max(24,available));pages=chunks.size();page=Math.floorMod(prefs(c).getInt("detailPage"+id,0),pages);v.setTextViewText(R.id.detail_text,chunks.get(page));
+    int available=bodyHeight(height)+(screen==SETTINGS?56:0)-32-(d.price.isEmpty()?0:36)-(screen==SETTINGS?52:0);
+    List<String>chunks=screen==SETTINGS?java.util.Collections.singletonList(d.text):split(c,d.text,Math.max(160,width-20),Math.max(24,available));pages=chunks.size();page=Math.floorMod(prefs(c).getInt("detailPage"+id,0),pages);v.setTextViewText(R.id.detail_text,chunks.get(page));
    }
    v.setTextViewText(R.id.page_label,(page+1)+" / "+pages+"\n분석 설명");
   }
