@@ -16,10 +16,16 @@ for kind in ('drawable', 'layout', 'xml'):
     for name in set(re.findall(r'\bR\.'+kind+r'\.([A-Za-z0-9_]+)', java)):
         assert (res/kind/(name+'.xml')).exists(), (kind,name)
 print('PASS resource references')
-assert 'setPeriodic(7_200_000L,600_000L)' in java
+assert 'setPeriodic(900_000L,300_000L)' in java
 assert 'setRequestMethod("GET")' in java
 assert '/v1/orders' not in java and '/v1/withdraws' not in java
 assert 'x-cg-demo-api-key' in java and 'AES/GCM/NoPadding' in java
 assert 'usesCleartextTraffic="false"' in (root/'app/src/main/AndroidManifest.xml').read_text()
 assert 'READ_CONTACTS' not in java and 'ACCESS_FINE_LOCATION' not in java
-print('PASS 2-hour schedule / read-only / encryption / HTTPS configuration')
+print('PASS 15-minute schedule / read-only / encryption / HTTPS configuration')
+
+widget = (root/'app/src/main/java/kr/sejong/coinwidget/Dashboard.java').read_text()
+assert 'getActivity(' not in widget and 'Renderer.activity(' not in widget and 'ACTION_VIEW' not in widget and 'MainActivity' not in widget
+assert 'OPTION_APPWIDGET_SIZES' in java
+assert 'long_candidates' in java and 'pulse_ratio' in java
+print('PASS widget has no activity/browser actions; responsive sizes and three distinct recommendation lists')

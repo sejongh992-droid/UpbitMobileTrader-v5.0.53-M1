@@ -9,6 +9,8 @@ public final class MarketJobService extends JobService {
     private final ConcurrentHashMap<Integer,Run> runs=new ConcurrentHashMap<>();
     private static final class Run {volatile Future<?>future;}
     @Override public boolean onStartJob(JobParameters params){
+        if(params.getJobId()==Scheduler.EXPIRE){MarketWidget.renderAll(this);return false;}
+        if(params.getJobId()==Scheduler.MORNING)new Handler(Looper.getMainLooper()).postDelayed(()->Scheduler.scheduleMorning(this),1000);
         if(Repository.RUNNING.get())return false;
         Run run=new Run();runs.put(params.getJobId(),run);
         run.future=executor.submit(()->{

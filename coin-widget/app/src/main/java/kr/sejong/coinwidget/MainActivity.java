@@ -22,31 +22,30 @@ public final class MainActivity extends Activity implements android.content.Shar
   scroll.addView(content,new ScrollView.LayoutParams(-1,-2));setContentView(scroll);
   if(Build.VERSION.SDK_INT>=30){getWindow().setDecorFitsSystemWindows(false);scroll.setOnApplyWindowInsetsListener((view,insets)->{Insets p=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());view.setPadding(p.left,p.top,p.right,p.bottom);return insets;});}else scroll.setFitsSystemWindows(true);
   if(getIntent().hasExtra("view_mode"))Dashboard.move(this,0,getIntent().getIntExtra("view_mode",0)==1?1:0);
-  getSharedPreferences("cache",0).registerOnSharedPreferenceChangeListener(this);Scheduler.ensure(this);draw();
+  getSharedPreferences("cache",0).registerOnSharedPreferenceChangeListener(this);getSharedPreferences("widget_ui",0).registerOnSharedPreferenceChangeListener(this);Scheduler.ensure(this);draw();
  }
  @Override protected void onResume(){
   super.onResume();if(content!=null)draw();
   JSONObject cached=Renderer.obj(Repository.load(this),"market");
-  if(cached.optInt("schema")<3||System.currentTimeMillis()-cached.optLong("quote_at",cached.optLong("fetched_at"))>15*60_000L)
+  if(cached.optInt("schema")<4||System.currentTimeMillis()-cached.optLong("quote_at",cached.optLong("fetched_at"))>5*60_000L)
    main.postDelayed(()->{if(!isFinishing()&&!isDestroyed()&&!Repository.RUNNING.get())refresh();},350);
  }
 
- @Override public void onSharedPreferenceChanged(android.content.SharedPreferences p,String key){if("snapshot".equals(key))main.post(()->{if(!isDestroyed())draw();});}
- @Override protected void onDestroy(){getSharedPreferences("cache",0).unregisterOnSharedPreferenceChangeListener(this);main.removeCallbacksAndMessages(null);super.onDestroy();}
+ @Override public void onSharedPreferenceChanged(android.content.SharedPreferences p,String key){if("snapshot".equals(key)||(!key.startsWith("pages")&&key.endsWith("0")))main.post(()->{if(!isDestroyed())draw();});}
+ @Override protected void onDestroy(){getSharedPreferences("cache",0).unregisterOnSharedPreferenceChangeListener(this);getSharedPreferences("widget_ui",0).unregisterOnSharedPreferenceChangeListener(this);main.removeCallbacksAndMessages(null);super.onDestroy();}
  TextView text(String s,int size,boolean bold){TextView v=new TextView(this);v.setText(s);v.setTextSize(size);v.setTextColor(Charts.INK);v.setPadding(dp(4),dp(7),dp(4),dp(7));if(bold)v.setTypeface(null,android.graphics.Typeface.BOLD);return v;}
  Button button(String s,Runnable r){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(13);b.setOnClickListener(v->r.run());return b;}
  void draw(){
   int oldY=scroll.getScrollY();content.removeAllViews();content.addView(text("코인 시장 위젯",23,true));
-  content.addView(text("조회 전용 · 자동매매 프로그램과 별개 · v1.1.1",12,false));
+  content.addView(text("조회 전용 · 자동매매 프로그램과 별개 · v1.2.0",12,false));
   LinearLayout row=new LinearLayout(this);
   row.addView(button("홈 화면에 추가",this::pin),new LinearLayout.LayoutParams(0,dp(50),1));
   row.addView(button("API / 갱신 설정",()->SettingsUi.show(this)),new LinearLayout.LayoutParams(0,dp(50),1));content.addView(row);
   try{
-   View card=Dashboard.build(this,660,0).apply(this,content);
-   for(int action=0;action<4;action++){final int which=action;card.findViewById(new int[]{R.id.tab_today,R.id.tab_morning,R.id.page_prev,R.id.page_next}[action]).setOnClickListener(v->{Dashboard.move(this,0,which);draw();});}
-   card.findViewById(R.id.refresh).setOnClickListener(v->refresh());card.findViewById(R.id.open_app).setOnClickListener(v->scroll.smoothScrollTo(0,card.getBottom()+dp(10)));
-   card.findViewById(R.id.btc_chart).setOnClickListener(v->openChart("KRW-BTC"));card.findViewById(R.id.btc_price).setOnClickListener(v->openChart("KRW-BTC"));
-   LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=dp(10);content.addView(card,p);
+   int width=(int)(getResources().getDisplayMetrics().widthPixels/getResources().getDisplayMetrics().density)-28;
+   View card=Dashboard.build(this,width,720,0).apply(this,content);
+   card.findViewById(R.id.refresh).setOnClickListener(v->refresh());
+   LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,dp(720));p.topMargin=dp(10);content.addView(card,p);
   }catch(RuntimeException e){content.addView(text("위젯 미리보기를 표시하지 못했습니다. 새로고침 후 다시 확인하세요.",14,false));}
   content.addView(button("화면 읽는 법 · 쉬운 설명",()->HelpUi.show(this)));
   WatchDetails.add(this,content,Repository.load(this));

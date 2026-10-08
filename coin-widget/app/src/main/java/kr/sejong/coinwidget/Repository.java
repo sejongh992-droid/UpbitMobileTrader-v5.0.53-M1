@@ -25,6 +25,7 @@ final class Repository {
    }catch(Exception e){cancelCheck();root.put("fx_failed",true);errors.put("환율: "+safe(e));}
    cancelCheck();root.put("errors",errors).put("last_finished",System.currentTimeMillis());
    if(!c.getSharedPreferences("cache",0).edit().putString("snapshot",root.toString()).commit())throw new IOException("조회 결과 저장 실패");
+   JSONObject market=Renderer.obj(root,"market");Scheduler.expire(c,market.optLong("quote_at"),market.optLong("recheck_at",Long.MAX_VALUE));
    return !root.optBoolean("market_failed",true);
   }finally{RUNNING.set(false);MarketWidget.renderAll(c);}
  }

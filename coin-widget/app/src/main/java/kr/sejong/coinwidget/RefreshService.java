@@ -16,7 +16,6 @@ public final class RefreshService extends Service {
         nm.createNotificationChannel(new NotificationChannel("refresh","시세 새로고침",NotificationManager.IMPORTANCE_LOW));
         Notification note=new Notification.Builder(this,"refresh").setSmallIcon(R.drawable.ic_refresh)
             .setContentTitle("코인 시장 자료 조회 중").setContentText("완료되면 이 알림은 사라집니다.")
-            .setContentIntent(Renderer.activity(this,14,new Intent(this,MainActivity.class)))
             .setOngoing(true).setOnlyAlertOnce(true).build();
         startForeground(400,note);
         if(task!=null&&!task.isDone())return START_NOT_STICKY;

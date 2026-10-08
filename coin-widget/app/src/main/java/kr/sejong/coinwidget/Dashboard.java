@@ -2,6 +2,9 @@ package kr.sejong.coinwidget;
 import android.app.*;
 import android.content.*;
 import android.net.Uri;
+import android.os.Build;
+import android.text.*;
+import android.util.TypedValue;
 import android.view.View;
 import android.widget.RemoteViews;
 import org.json.*;
@@ -9,69 +12,109 @@ import java.util.*;
 final class Dashboard {
  static final int INK=0xff1c2940,PURPLE=0xff6550cc,MUTED=0xff738096;
  static final String NAV="kr.sejong.coinwidget.NAV";
+ static final int MARKET=4,HELP=5,SETTINGS=6,BACK=7,AUTO=8,BTC=9,DOM=10,LONG=11,COIN=20;
  static String f(double v){return Signals.finite(v)?String.format(Locale.KOREA,"%.1f",v):"—";}
- static int mode(Context c,int id){return c.getSharedPreferences("widget_ui",0).getInt("mode"+id,0);}
- static void move(Context c,int id,int action){android.content.SharedPreferences p=c.getSharedPreferences("widget_ui",0);if(action<2)p.edit().putInt("mode"+id,action).putInt("page"+id,0).apply();else p.edit().putInt("page"+id,Math.max(0,p.getInt("page"+id,0)+(action==2?-1:1))).apply();}
- static PendingIntent nav(Context c,int id,int action){Intent i=new Intent(c,MarketWidget.class).setAction(NAV).addFlags(Intent.FLAG_RECEIVER_FOREGROUND).setData(Uri.parse("coinwidget://nav/"+id+"/"+action)).putExtra("widget",id).putExtra("nav",action);return PendingIntent.getBroadcast(c,100+action,i,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);}
- static JSONArray list(JSONObject market,int mode){return Renderer.arr(market,mode==1?"next_candidates":"watchlist");}
- static RemoteViews build(Context c,int height,int id){
-  height=(int)(height/Math.max(1f,c.getResources().getConfiguration().fontScale));
-  boolean compact=height<480;int rows=height>=750?5:height>=700?4:height>=600?3:height>=520?2:1;
-  JSONObject r=Repository.load(c),m=Renderer.obj(r,"market"),btc=Renderer.obj(m,"btc"),t=Renderer.obj(m,"btc_technical"),dom=Renderer.obj(r,"dominance"),fx=Renderer.obj(r,"fx");
-  RemoteViews v=new RemoteViews(c.getPackageName(),R.layout.widget_v110);int mode=mode(c,id);boolean fresh=Renderer.freshMarket(r)&&m.optInt("schema")>=3;
-  v.setTextViewText(R.id.fx,fx.has("rate")?"USD  "+Charts.number(fx.optDouble("rate"))+"원\n"+fx.optString("date")+(r.optBoolean("fx_failed")?" · 이전":" 기준"):"환율 조회 전");
-  v.setTextViewText(R.id.btc_price,btc.has("price")?Charts.number(btc.optDouble("price"))+"원":"— 원");
-  v.setTextViewText(R.id.btc_sub,"09시 기준 "+Charts.pct(btc.optDouble("day_pct",Double.NaN))+"  ·  6시간 "+Charts.pct(t.optDouble("return6h",Double.NaN)));
-  v.setTextColor(R.id.btc_sub,btc.optDouble("day_pct")>=0?Charts.UP:Charts.DOWN);v.setTextViewText(R.id.btc_state,m.optString("btc_regime","조회 전"));
-  v.setImageViewBitmap(R.id.btc_chart,MiniCharts.btc(Renderer.arr(m,"daily")));
-  v.setTextViewText(R.id.btc_stats,"완료 일봉 RSI "+f(t.optDouble("rsi",Double.NaN))+"  ·  20일 저점 "+MiniCharts.won(t.optDouble("low20",Double.NaN))+" / 고점 "+MiniCharts.won(t.optDouble("high20",Double.NaN)));
-  v.setTextViewText(R.id.dom_title,"비트코인 도미넌스  "+(dom.has("value")?String.format(Locale.KOREA,"%.2f%%",dom.optDouble("value")):"—"));
-  v.setImageViewBitmap(R.id.dom_chart,MiniCharts.share(dom));
-  double delta=dom.optDouble("delta24",Double.NaN);boolean domFresh=!r.optBoolean("dom_failed")&&dom.optLong("time")>0&&System.currentTimeMillis()-dom.optLong("time")>=-60000&&System.currentTimeMillis()-dom.optLong("time")<=3*Signals.HOUR;
-  String change=Signals.finite(delta)?String.format(Locale.KOREA,"약24시간 %+.2f%%p",delta):"24h 비교 기록 수집 중";
-
-  v.setTextViewText(R.id.dom_meta,dom.optString("source")+" · "+Charts.date(dom.optLong("time"),"HH:mm")+" · "+change+(domFresh?"":" · 이전 자료"));
-  v.setTextViewText(R.id.breadth,"09시 기준 상승 "+f(m.optDouble("breadth",Double.NaN))+"%  ·  "+m.optInt("advancing")+"/"+m.optInt("alt_count")+"종목");
-  String regime=Signals.altRegime(m.optDouble("breadth",Double.NaN),m.optString("btc_regime"),domFresh?delta:Double.NaN);
-  if(m.optBoolean("defensive"))regime="방어 관찰 · "+m.optString("defense_reason");
-  v.setTextViewText(R.id.market_summary,regime+(fresh?"":" · 재조회 필요"));
-  String deadline=Charts.date(m.optLong("recheck_at"),"MM/dd HH:mm");boolean expired=mode==1&&System.currentTimeMillis()>=m.optLong("recheck_at");
-  JSONArray items=fresh&&!expired?list(m,mode):new JSONArray();int total=items.length(),pages=Math.max(1,(total+rows-1)/rows);
-  int savedPage=c.getSharedPreferences("widget_ui",0).getInt("page"+id,0);int page=Math.max(0,savedPage)%pages;
-  if(page!=savedPage)c.getSharedPreferences("widget_ui",0).edit().putInt("page"+id,page).apply();
-  v.setTextColor(R.id.tab_today,mode==0?PURPLE:MUTED);v.setTextColor(R.id.tab_morning,mode==1?PURPLE:MUTED);
-  v.setInt(R.id.tab_today,"setBackgroundResource",mode==0?R.drawable.tab_selected:R.drawable.tab_idle);v.setInt(R.id.tab_morning,"setBackgroundResource",mode==1?R.drawable.tab_selected:R.drawable.tab_idle);
-  v.setTextViewText(R.id.today,!fresh?"자료 재조회 필요":mode==0?"조건 충족 "+Renderer.arr(m,"candidates").length()+" · 관심 목록 "+total+"개":deadline+" 전 · 조건부 검토 "+m.optInt("pre_count")+"개");
-  v.setTextViewText(R.id.next_day,mode==0?"조회 당시 평가 · 이름을 누르면 차트":"다음 09시 전 재점검 · 상승 예측 아님");
-  v.removeAllViews(R.id.coin_rows);
-  if(total==0){RemoteViews empty=new RemoteViews(c.getPackageName(),R.layout.coin_empty);empty.setTextViewText(R.id.empty_label,expired?"09시가 지났습니다. 새로고침하세요.":fresh?"검증 가능한 후보가 없습니다.\n조건을 충족하지 않은 종목은 채우지 않습니다.":"새로고침 후 후보와 근거가 표시됩니다.");v.addView(R.id.coin_rows,empty);}
-  for(int j=page*rows;j<Math.min(total,(page+1)*rows);j++){
-   JSONObject a=items.optJSONObject(j),q=Renderer.obj(a,"quote");RemoteViews row=new RemoteViews(c.getPackageName(),R.layout.coin_row);
-   String symbol=q.optString("market").replace("KRW-","");String name=q.optString("name",symbol);
-   row.setTextViewText(R.id.row_name,(j+1)+"  "+name+" ("+symbol+")");
-   row.setTextViewText(R.id.row_price,Charts.number(q.optDouble("price"))+"원  "+Charts.pct(q.optDouble("day_pct")));
-   row.setTextColor(R.id.row_price,q.optDouble("day_pct")>=0?Charts.UP:Charts.DOWN);
-   boolean qualified=a.optBoolean(mode==1?"pre_qualified":"qualified");
-   row.setTextViewText(R.id.row_status,Math.round(a.optDouble(mode==1?"morning_score":"score"))+"점 · "+(qualified?"조건 충족":a.optString("state").equals("추격 주의")?"추격 주의":"관찰 대기")+" · 상대6h "+Charts.pct(a.optDouble("relative6h",Double.NaN)).replace("%","%p"));row.setTextColor(R.id.row_status,qualified?PURPLE:MUTED);
-   Intent chart=new Intent(Intent.ACTION_VIEW,Uri.parse("https://upbit.com/exchange?code=CRIX.UPBIT."+q.optString("market")));row.setOnClickPendingIntent(R.id.row_root,Renderer.activity(c,300+j+id*100,chart));
-   v.addView(R.id.coin_rows,row);
+ static SharedPreferences prefs(Context c){return c.getSharedPreferences("widget_ui",0);}
+ static int mode(Context c,int id){return prefs(c).getInt("mode"+id,0);}
+ static int screen(Context c,int id){return prefs(c).getInt("screen"+id,0);}
+ static void move(Context c,int id,int action){move(c,id,action,"");}
+ static void move(Context c,int id,int action,String market){
+  SharedPreferences p=prefs(c);SharedPreferences.Editor e=p.edit();
+  if(action==0||action==1||action==LONG)e.putInt("mode"+id,action==LONG?2:action).putInt("screen"+id,0).putInt("page"+id,0);
+  else if(action==2||action==3){String key=(screen(c,id)==0?"page":"detailPage")+id;int count=Math.max(1,p.getInt("pages"+id,1));int target=(p.getInt(key,0)+(action==2?count-1:1))%count;if(market.matches("page:[0-9]{1,4}"))target=Integer.parseInt(market.substring(5));e.putInt(key,target);}
+  else if(action==BACK)e.putInt("screen"+id,0);
+  else if(action==AUTO){boolean auto=c.getSharedPreferences("settings",0).getBoolean("auto",true);c.getSharedPreferences("settings",0).edit().putBoolean("auto",!auto).apply();Scheduler.ensure(c);}
+  else if(action==HELP||action==SETTINGS||action==BTC||action==DOM||action==MARKET)e.putInt("screen"+id,action).putInt("detailPage"+id,0);
+  else if(action==COIN&&market.matches("KRW-[A-Z0-9]+"))e.putInt("screen"+id,COIN).putString("coin"+id,market).putInt("detailPage"+id,0);
+  e.apply();
+ }
+ static PendingIntent nav(Context c,int id,int action){return nav(c,id,action,"");}
+ static PendingIntent nav(Context c,int id,int action,String market){
+  Intent i=new Intent(c,MarketWidget.class).setAction(NAV).addFlags(Intent.FLAG_RECEIVER_FOREGROUND).setData(Uri.parse("coinwidget://nav/"+id+"/"+action+"/"+Uri.encode(market))).putExtra("widget",id).putExtra("nav",action).putExtra("market",market);
+  return PendingIntent.getBroadcast(c,100+action,i,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+ }
+ static boolean freshRecommendation(JSONObject root,int mode,long now){
+  JSONObject m=Renderer.obj(root,"market");long age=now-m.optLong("quote_at");
+  return Renderer.freshMarket(root)&&m.optInt("schema")>=4&&age>=-60000&&age<=5*60_000L&&(mode!=1||now<m.optLong("recheck_at"));
+ }
+ static JSONArray list(JSONObject m,int mode){
+  JSONArray source=Renderer.arr(m,mode==1?"next_candidates":mode==2?"long_candidates":"candidates"),result=new JSONArray();
+  if(m.optBoolean(mode==2?"long_defensive":"defensive",true))return result;
+  for(int i=0;i<source.length();i++){JSONObject a=source.optJSONObject(i);if(a!=null&&a.optBoolean(mode==1?"pre_qualified":"qualified"))result.put(a);}return result;
+ }
+ static void visible(RemoteViews v,int id,boolean show){v.setViewVisibility(id,show?View.VISIBLE:View.GONE);}
+ static String summary(JSONObject m){return m.optBoolean("defensive",true)?"매수 관망 · "+m.optString("defense_reason","시장 자료 확인 필요"):"BTC "+m.optString("btc_regime","판단 보류")+" · 알트 상승 "+f(m.optDouble("breadth",Double.NaN))+"%";}
+ static int bodyHeight(int height){return Math.max(60,height-250);}
+ static int rows(Context c,int height){int body=bodyHeight(height);int banner=body>=250?56:0;float font=Math.max(1f,c.getResources().getConfiguration().fontScale);return Math.max(1,Math.min(8,(int)((body-banner-24)/(76*font))));}
+ static RemoteViews build(Context c,int height,int id){return build(c,340,height,id);}
+ static RemoteViews build(Context c,int width,int height,int id){
+  long now=System.currentTimeMillis();int mode=mode(c,id),screen=screen(c,id);JSONObject root=Repository.load(c),m=Renderer.obj(root,"market"),btc=Renderer.obj(m,"btc"),t=Renderer.obj(m,"btc_technical"),dom=Renderer.obj(root,"dominance"),fx=Renderer.obj(root,"fx");
+  RemoteViews v=new RemoteViews(c.getPackageName(),R.layout.widget_v120);
+  v.setTextViewText(R.id.fx,fx.has("rate")?"USD "+Charts.number(fx.optDouble("rate"))+"원\n"+fx.optString("date")+(root.optBoolean("fx_failed")?" · 이전":" 기준"):"환율 조회 전");
+  int[]tabs={R.id.tab_today,R.id.tab_morning,R.id.tab_long};int[]actions={0,1,LONG};
+  for(int j=0;j<tabs.length;j++){v.setTextColor(tabs[j],mode==j?PURPLE:MUTED);v.setInt(tabs[j],"setBackgroundResource",mode==j?R.drawable.tab_selected:R.drawable.tab_idle);v.setOnClickPendingIntent(tabs[j],nav(c,id,actions[j]));}
+  visible(v,R.id.market_panel,screen==MARKET);visible(v,R.id.recommendations,screen==0);visible(v,R.id.detail_panel,screen!=0&&screen!=MARKET);
+  boolean fresh=freshRecommendation(root,mode,now);JSONArray items=fresh?list(m,mode):new JSONArray();
+  int pages=1,page=0;v.setOnClickPendingIntent(R.id.page_label,nav(c,id,BACK));
+  if(screen==0){
+   int count=rows(c,height);pages=Math.max(1,(items.length()+count-1)/count);page=Math.floorMod(prefs(c).getInt("page"+id,0),pages);
+   visible(v,R.id.breadth,bodyHeight(height)>=250);v.setTextViewText(R.id.breadth,summary(m));
+   String phase=BeforeNine.entryWindow(now)?"9시 전 매수 검토":Charts.date(m.optLong("recheck_at"),"MM/dd")+" 09시 예비";
+   v.setTextViewText(R.id.today,mode==0?"금일 상승 조건 · "+items.length()+"종목":mode==2?"1~3개월 일봉 조건 · "+items.length()+"종목":phase+" · "+items.length()+"종목");v.removeAllViews(R.id.coin_rows);
+   if(items.length()==0){RemoteViews empty=new RemoteViews(c.getPackageName(),R.layout.coin_empty);String msg;
+    if(Repository.RUNNING.get())msg="최신 시세 분석 중\n잠시 후 이 화면에 표시됩니다.";
+    else if(!fresh)msg=mode==1&&m.optLong("recheck_at")>0&&now>=m.optLong("recheck_at")?"이 목록의 9시 진입 마감\n장중 추천 또는 새로고침을 선택하세요.":"최신 분석이 필요합니다\n새로고침을 눌러 주세요.\n추천 유효시간은 조회 후 5분입니다.";
+    else msg="지금은 매수 관망\n"+(m.optBoolean(mode==2?"long_defensive":"defensive",true)?(mode==2?"BTC 일봉 하락 또는 자료 부족":m.optString("defense_reason","시장 방어 조건")):"상승 추세·거래 증가·가격 조건을\n함께 통과한 종목이 없습니다.");
+    empty.setTextViewText(R.id.empty_label,msg);v.addView(R.id.coin_rows,empty);
+   }
+   for(int j=page*count;j<Math.min(items.length(),(page+1)*count);j++){
+    JSONObject a=items.optJSONObject(j),q=Renderer.obj(a,"quote");String code=q.optString("market"),symbol=code.replace("KRW-","");RemoteViews row=new RemoteViews(c.getPackageName(),R.layout.coin_row);
+    row.setTextViewText(R.id.row_name,(j+1)+"  "+q.optString("name",symbol)+" ("+symbol+")");
+    row.setTextViewText(R.id.row_price,Charts.number(q.optDouble("price"))+"원  "+Charts.pct(q.optDouble("day_pct")));
+    row.setTextColor(R.id.row_price,q.optDouble("day_pct")>=0?Charts.UP:Charts.DOWN);
+    row.setTextViewText(R.id.row_status,mode==2?"30일 "+Charts.pct(a.optDouble("return30",Double.NaN))+" · 거래 "+f(a.optDouble("volume_ratio",Double.NaN))+"배  ›":"15분 "+Charts.pct(a.optDouble("pulse_change",Double.NaN))+" · 거래 "+f(a.optDouble("pulse_ratio",Double.NaN))+"배  ›");
+    row.setOnClickPendingIntent(R.id.row_root,nav(c,id,COIN,code));v.addView(R.id.coin_rows,row);
+   }
+   v.setTextViewText(R.id.page_label,(page+1)+" / "+pages+"\n"+(mode==1&&!BeforeNine.entryWindow(now)?"예비 · 08시 재검토":"종목을 눌러 분석"));
+  }else if(screen==MARKET){
+   v.setTextViewText(R.id.btc_price,btc.has("price")?Charts.number(btc.optDouble("price"))+"원":"— 원");
+   v.setTextViewText(R.id.btc_state,m.optString("btc_regime","조회 전"));
+   v.setTextViewText(R.id.btc_sub,"09시 기준 "+Charts.pct(btc.optDouble("day_pct",Double.NaN))+" · 6h "+Charts.pct(t.optDouble("return6h",Double.NaN)));
+   v.setImageViewBitmap(R.id.btc_chart,MiniCharts.btc(Renderer.arr(m,"daily")));
+   v.setTextViewText(R.id.btc_stats,"일봉 · 금색 20일 / 청록 60일 평균\n완료 일봉 RSI "+f(t.optDouble("rsi",Double.NaN))+" · 차트를 누르면 확대");
+   v.setTextViewText(R.id.dom_title,"BTC 도미넌스 "+(dom.has("value")?String.format(Locale.KOREA,"%.2f%%",dom.optDouble("value")):"—"));v.setImageViewBitmap(R.id.dom_chart,MiniCharts.share(dom));
+   v.setTextViewText(R.id.market_summary,summary(m)+(Renderer.freshMarket(root)?"":" · 이전 자료"));
+   visible(v,R.id.btc_label,height>=480);visible(v,R.id.btc_state,height>=480);visible(v,R.id.btc_chart,height>=480);visible(v,R.id.btc_stats,height>=600);visible(v,R.id.dom_group,height>=540);
+   v.setOnClickPendingIntent(R.id.btc_chart,nav(c,id,BTC));v.setOnClickPendingIntent(R.id.dom_group,nav(c,id,DOM));
+   v.setTextViewText(R.id.page_label,"시장 요약\n차트는 눌러 확대");v.setOnClickPendingIntent(R.id.page_prev,nav(c,id,BTC));v.setOnClickPendingIntent(R.id.page_next,nav(c,id,DOM));
+   v.setTextViewText(R.id.page_prev,"BTC 차트");v.setTextViewText(R.id.page_next,"비중 분석");
+  }else{
+   DetailContent.Result d=DetailContent.forScreen(c,id,screen,root,mode,now);v.setTextViewText(R.id.detail_title,d.title);v.setTextViewText(R.id.detail_price,d.price);visible(v,R.id.detail_price,!d.price.isEmpty());
+   visible(v,R.id.detail_action,screen==SETTINGS);v.setTextViewText(R.id.detail_action,c.getSharedPreferences("settings",0).getBoolean("auto",true)?"자동 조회 켜짐 · 누르면 끄기":"자동 조회 꺼짐 · 누르면 켜기");v.setOnClickPendingIntent(R.id.detail_action,nav(c,id,AUTO));
+   if(d.chart!=null&&height>=480){visible(v,R.id.detail_chart,true);v.setImageViewBitmap(R.id.detail_chart,d.chart);visible(v,R.id.detail_text,false);visible(v,R.id.chart_caption,true);v.setTextViewText(R.id.chart_caption,d.text);}
+   else{
+    int available=bodyHeight(height)-48-(d.price.isEmpty()?0:36)-(screen==SETTINGS?52:0);
+    List<String>chunks=split(c,d.text,Math.max(160,width-20),Math.max(24,available));pages=chunks.size();page=Math.floorMod(prefs(c).getInt("detailPage"+id,0),pages);v.setTextViewText(R.id.detail_text,chunks.get(page));
+   }
+   v.setTextViewText(R.id.page_label,(page+1)+" / "+pages+"\n↩ 목록으로");
   }
-  v.setTextViewText(R.id.page_label,(page+1)+" / "+pages+"   ·   "+total+"종목");
-  for(int action=0;action<4;action++)v.setOnClickPendingIntent(new int[]{R.id.tab_today,R.id.tab_morning,R.id.page_prev,R.id.page_next}[action],nav(c,id,action));
-  v.setTextViewText(R.id.updated,(c.getSharedPreferences("settings",0).getBoolean("auto",true)?"2시간 자동":"수동 조회")+" · 조회 시세\n"+Charts.date(Renderer.obj(m,"btc").optLong("time",m.optLong("quote_at")),"MM/dd HH:mm")+" KST");
-  JSONArray errors=Renderer.arr(r,"errors");v.setTextViewText(R.id.warning,errors.length()>0?errors.optString(0):!m.optString("screening_error").isEmpty()?m.optString("screening_error"):"점수는 확률 아님 · 매수 전 최신 조회");
-  v.setTextViewText(R.id.refresh,Repository.RUNNING.get()?"조회 중…":"↻ 새로고침");
-  v.setOnClickPendingIntent(R.id.refresh,PendingIntent.getForegroundService(c,12,new Intent(c,RefreshService.class).setAction("kr.sejong.coinwidget.REFRESH"),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE));
-  PendingIntent app=Renderer.activity(c,10+id*10+mode,new Intent(c,MainActivity.class).setData(Uri.parse("coinwidget://details/"+id+"/"+mode)).putExtra("view_mode",mode));v.setOnClickPendingIntent(R.id.open_app,app);v.setOnClickPendingIntent(R.id.title,app);
-  v.setOnClickPendingIntent(R.id.btc_chart,Renderer.activity(c,11,new Intent(Intent.ACTION_VIEW,Uri.parse("https://upbit.com/exchange?code=CRIX.UPBIT.KRW-BTC")))) ;
-  v.setOnClickPendingIntent(R.id.dom_title,Renderer.activity(c,15,new Intent(Intent.ACTION_VIEW,Uri.parse("https://www.tradingview.com/symbols/BTC.D/"))));
-  if(height<680){v.setViewVisibility(R.id.next_day,View.GONE);v.setViewVisibility(R.id.chart_legend,View.GONE);v.setViewVisibility(R.id.btc_stats,View.GONE);}
-  if(height<600)v.setViewVisibility(R.id.dom_meta,View.GONE);
-  if(height<540)v.setViewVisibility(R.id.breadth,View.GONE);
-  if(height<360)v.setViewVisibility(R.id.warning,View.GONE);
-  if(compact){v.setViewVisibility(R.id.btc_sub,View.GONE);v.setTextViewTextSize(R.id.btc_price,android.util.TypedValue.COMPLEX_UNIT_SP,22);}
-  if(android.os.Build.VERSION.SDK_INT>=31)v.setViewLayoutHeight(R.id.btc_chart,height<540?30:height<640?48:72,android.util.TypedValue.COMPLEX_UNIT_DIP);
-  if(compact){v.setViewVisibility(R.id.btc_chart,View.GONE);v.setViewVisibility(R.id.breadth,View.GONE);v.setViewVisibility(R.id.dom_chart,View.GONE);v.setViewVisibility(R.id.dom_meta,View.GONE);v.setViewVisibility(R.id.btc_stats,View.GONE);v.setViewVisibility(R.id.next_day,View.GONE);v.setViewVisibility(R.id.chart_legend,View.GONE);v.setViewVisibility(R.id.dom_title,View.GONE);}
+  prefs(c).edit().putInt("pages"+id,pages).apply();
+  if(screen!=MARKET){v.setOnClickPendingIntent(R.id.page_prev,nav(c,id,2,"page:"+((page+pages-1)%pages)));v.setOnClickPendingIntent(R.id.page_next,nav(c,id,3,"page:"+((page+1)%pages)));}
+  String status=Repository.RUNNING.get()?"조회 중…":root.optBoolean("market_failed")?"조회 실패 · 이전 자료":fresh?"추천 유효 ~ "+Charts.date(Math.min(m.optLong("quote_at")+5*60_000L,mode==1?m.optLong("recheck_at"):Long.MAX_VALUE),"HH:mm"):"추천 재조회 필요";
+  v.setTextViewText(R.id.updated,"분석 "+Charts.date(m.optLong("quote_at"),"MM/dd HH:mm:ss")+" KST · "+status+"\n"+(c.getSharedPreferences("settings",0).getBoolean("auto",true)?"15분 자동 · 절전 시 지연":"수동 조회")+" · 점수는 상승 확률 아님");
+  v.setOnClickPendingIntent(R.id.market_home,nav(c,id,screen==MARKET?BACK:MARKET));v.setTextViewText(R.id.market_home,screen==MARKET?"목록":"시장");
+  v.setTextViewText(R.id.open_app,screen==HELP?"설정":screen==SETTINGS?"목록":"설명");v.setOnClickPendingIntent(R.id.open_app,nav(c,id,screen==HELP?SETTINGS:screen==SETTINGS?BACK:HELP));
+  v.setTextViewText(R.id.refresh,Repository.RUNNING.get()?"조회 중…":"↻ 갱신");v.setOnClickPendingIntent(R.id.refresh,PendingIntent.getForegroundService(c,12,new Intent(c,RefreshService.class).setAction("kr.sejong.coinwidget.REFRESH"),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE));
   return v;
+ }
+ static List<String> split(Context c,String text,int widthDp,int heightDp){
+  float density=c.getResources().getDisplayMetrics().density;TextPaint paint=new TextPaint(android.graphics.Paint.ANTI_ALIAS_FLAG);paint.setTextSize(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP,15,c.getResources().getDisplayMetrics()));
+  List<String>pages=new ArrayList<>();int width=Math.max(80,(int)(widthDp*density)),height=Math.max(1,(int)((heightDp-4)*density));String rest=text;
+  while(!rest.isEmpty()){
+   StaticLayout layout=StaticLayout.Builder.obtain(rest,0,rest.length(),paint,width).setIncludePad(false).setLineSpacing(2*density,1).build();int line=0;
+   while(line+1<layout.getLineCount()&&layout.getLineBottom(line+1)<=height)line++;
+   int end=layout.getLineEnd(line);if(end<=0)end=Math.min(1,rest.length());pages.add(rest.substring(0,end).trim());rest=rest.substring(end).replaceFirst("^\\s+","");
+  }
+  if(pages.isEmpty())pages.add("자료가 없습니다. 새로고침하세요.");return pages;
  }
 }

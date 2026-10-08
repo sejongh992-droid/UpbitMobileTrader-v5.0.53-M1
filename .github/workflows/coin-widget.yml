@@ -1,7 +1,7 @@
 name: Coin widget APK and Android checks
 on:
   push:
-    branches: [coin-widget-v111]
+    branches: [coin-widget-v120]
     paths:
       - 'coin-widget/**'
       - '.github/workflows/coin-widget.yml'
@@ -47,12 +47,12 @@ jobs:
       - name: Verify and collect APK
         working-directory: coin-widget
         run: |
-          cp app/build/outputs/apk/release/app-release.apk delivery/CoinMarketWidget-1.1.1-ci.apk
+          cp app/build/outputs/apk/release/app-release.apk delivery/CoinMarketWidget-1.2.0-ci.apk
           cp app/build/outputs/apk/androidTest/release/app-release-androidTest.apk delivery/tests.apk
           cp "$ANDROID_HOME/build-tools/34.0.0/lib/apksigner.jar" delivery/apksigner.jar
-          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose --print-certs delivery/CoinMarketWidget-1.1.1-ci.apk | tee delivery/signature-ci.txt
-          "$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging delivery/CoinMarketWidget-1.1.1-ci.apk > delivery/apk-badging.txt
-          unzip -t delivery/CoinMarketWidget-1.1.1-ci.apk
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose --print-certs delivery/CoinMarketWidget-1.2.0-ci.apk | tee delivery/signature-ci.txt
+          "$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging delivery/CoinMarketWidget-1.2.0-ci.apk > delivery/apk-badging.txt
+          unzip -t delivery/CoinMarketWidget-1.2.0-ci.apk
           sha256sum delivery/*.apk delivery/apksigner.jar > delivery/SHA256SUMS.txt
       - name: Upload installable build and test tools
         uses: actions/upload-artifact@v4

@@ -9,7 +9,7 @@ final class SettingsUi {
   a.getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
   SharedPreferences pref=a.getSharedPreferences("settings",0);
   LinearLayout body=new LinearLayout(a);body.setOrientation(LinearLayout.VERTICAL);body.setPadding(a.dp(18),a.dp(8),a.dp(18),a.dp(8));
-  CheckBox auto=new CheckBox(a);auto.setText("2시간 주기 자동 갱신");auto.setChecked(pref.getBoolean("auto",true));body.addView(auto);
+  CheckBox auto=new CheckBox(a);auto.setText("15분 + 08:30·08:50 자동 갱신");auto.setChecked(pref.getBoolean("auto",true));body.addView(auto);
   body.addView(a.text("업비트 현재가·일봉은 공개 API로 조회합니다. 업비트 Access Key / Secret Key를 입력하지 마세요.",13,false));
   RadioGroup sources=new RadioGroup(a);
   RadioButton paprika=new RadioButton(a);paprika.setId(View.generateViewId());paprika.setText("CoinPaprika 도미넌스 (기본·키 없음)");sources.addView(paprika);

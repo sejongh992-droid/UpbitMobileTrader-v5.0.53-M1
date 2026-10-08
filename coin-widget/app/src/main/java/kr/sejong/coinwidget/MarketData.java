@@ -23,7 +23,7 @@ final class MarketData {
   long now=System.currentTimeMillis();Signals.Quote btc=null;int count=0,up=0;
   for(Signals.Quote q:quotes){if(q.market.equals("KRW-BTC"))btc=q;if(Signals.isAlt(q.market)){count++;if(q.dayPct>0)up++;}}
   if(btc==null||btc.time<=0||now-btc.time>10*60_000L||btc.time>now+60_000L)throw new IOException("BTC 최신 시세 확인 실패");
-  List<Signals.Bar> daily=Repository.readBars(new JSONArray(net.get("https://api.upbit.com/v1/candles/days?market=KRW-BTC&count=120")));
+  List<Signals.Bar> daily=Repository.readBars(new JSONArray(net.get("https://api.upbit.com/v1/candles/days?market=KRW-BTC&count=160")));
   if(daily.size()<2)throw new IOException("BTC 일봉 자료 부족");
   return ResearchData.finish(net,quotes,btc,daily,now);
  }

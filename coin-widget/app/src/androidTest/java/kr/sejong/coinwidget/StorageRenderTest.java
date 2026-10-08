@@ -44,8 +44,8 @@ public class StorageRenderTest {
  }
  @Test public void fullAndCompactRemoteViewsInflate(){
   InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
-   FrameLayout parent=new FrameLayout(c);View full=Renderer.build(c,false).apply(c,parent);assertNotNull(full.findViewById(R.id.refresh));assertEquals(View.VISIBLE,full.findViewById(R.id.dom_chart).getVisibility());
-   View compact=Renderer.build(c,true).apply(c,parent);assertEquals(View.GONE,compact.findViewById(R.id.dom_chart).getVisibility());assertNotNull(compact.findViewById(R.id.btc_chart));
+   FrameLayout parent=new FrameLayout(c);Dashboard.move(c,0,Dashboard.MARKET);View full=Renderer.build(c,false).apply(c,parent);assertNotNull(full.findViewById(R.id.refresh));assertEquals(View.VISIBLE,full.findViewById(R.id.dom_group).getVisibility());
+   View compact=Renderer.build(c,true).apply(c,parent);assertEquals(View.GONE,compact.findViewById(R.id.dom_group).getVisibility());assertNotNull(compact.findViewById(R.id.btc_chart));
   });
  }
  @Test public void noConcurrentRefresh()throws Exception{Repository.RUNNING.set(true);assertFalse(Repository.refresh(c));}
