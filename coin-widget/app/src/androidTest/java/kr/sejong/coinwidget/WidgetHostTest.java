@@ -57,16 +57,21 @@ public class WidgetHostTest {
   return null;
  }
  @Test public void activityAndSettingsOpen()throws Exception{
-  fixture();Repository.RUNNING.set(true);
+  fixture();Repository.RUNNING.set(true);AtomicReference<AlertDialog> opened=new AtomicReference<>();
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(a->{assertNotNull(a.findViewById(R.id.refresh));opened.set(SettingsUi.show(a));});
+   // Android dispatches OnShowListener and OnDismissListener through the main Handler.
+   ins.waitForIdleSync();
    scenario.onActivity(a->{
-    assertNotNull(a.findViewById(R.id.refresh));AlertDialog dialog=SettingsUi.show(a);
-    assertTrue("Settings dialog must be shown",dialog.isShowing());assertNotNull(dialog.getWindow());
+    AlertDialog dialog=opened.get();assertTrue("Settings dialog must be shown",dialog.isShowing());assertNotNull(dialog.getWindow());
     assertTrue("Keep key-entry window protected",(dialog.getWindow().getAttributes().flags&WindowManager.LayoutParams.FLAG_SECURE)!=0);
     CheckBox auto=find(dialog.getWindow().getDecorView(),CheckBox.class);assertNotNull("Automatic refresh checkbox missing",auto);assertEquals("2시간 주기 자동 갱신",auto.getText().toString());assertFalse(auto.isChecked());
     EditText key=find(dialog.getWindow().getDecorView(),EditText.class);assertNotNull("API input missing",key);assertEquals(android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD,key.getInputType()&android.text.InputType.TYPE_MASK_VARIATION);
     auto.setChecked(true);dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
-    assertTrue("Save must persist auto setting",a.getSharedPreferences("settings",0).getBoolean("auto",false));assertFalse("Save must close the dialog",dialog.isShowing());
+   });
+   ins.waitForIdleSync();
+   scenario.onActivity(a->{
+    assertTrue("Save must persist auto setting",a.getSharedPreferences("settings",0).getBoolean("auto",false));assertFalse("Save must close the dialog",opened.get().isShowing());
     assertEquals("CoinPaprika",a.getSharedPreferences("settings",0).getString("dominance_source",""));
     assertEquals("Secure flag must clear after close",0,a.getWindow().getAttributes().flags&WindowManager.LayoutParams.FLAG_SECURE);
    });
