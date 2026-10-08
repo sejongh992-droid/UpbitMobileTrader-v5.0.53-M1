@@ -8,6 +8,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+defaults:
+  run:
+    shell: bash
 concurrency:
   group: coin-widget-${{ github.ref }}
   cancel-in-progress: true
@@ -28,6 +31,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+          cache-read-only: false
       - name: SDK packages
         run: sdkmanager 'platforms;android-35' 'build-tools;34.0.0'
       - name: Source checks
@@ -36,7 +40,7 @@ jobs:
           mkdir -p delivery
           bash tests/run_tests.sh | tee delivery/source-checks.txt
           git rev-parse HEAD > delivery/COMMIT.txt
-          git archive --format=zip --output=delivery/validated-source.zip HEAD coin-widget .github/workflows/coin-widget.yml
+          git -C .. archive --format=zip --output=coin-widget/delivery/validated-source.zip HEAD coin-widget .github/workflows/coin-widget.yml
       - name: Compile release and Android tests; lint
         working-directory: coin-widget
         run: gradle --no-daemon :app:assembleRelease :app:assembleReleaseAndroidTest :app:lintRelease
