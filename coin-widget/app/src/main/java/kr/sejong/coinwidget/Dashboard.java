@@ -108,10 +108,13 @@ final class Dashboard {
   return v;
  }
  static List<String> split(Context c,String text,int widthDp,int heightDp){
-  float density=c.getResources().getDisplayMetrics().density;TextPaint paint=new TextPaint(android.graphics.Paint.ANTI_ALIAS_FLAG);paint.setTextSize(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP,15,c.getResources().getDisplayMetrics()));
+  float density=c.getResources().getDisplayMetrics().density;
+  // Measure with the same TextView defaults as RemoteViews: Korean fallback fonts
+  // and high-quality line breaking can be taller than a default StaticLayout.
+  android.widget.TextView measure=new android.widget.TextView(c);measure.setTextSize(TypedValue.COMPLEX_UNIT_SP,15);measure.setIncludeFontPadding(false);measure.setLineSpacing(2*density,1);
   List<String>pages=new ArrayList<>();int width=Math.max(80,(int)(widthDp*density)),height=Math.max(1,(int)((heightDp-4)*density));String rest=text;
   while(!rest.isEmpty()){
-   StaticLayout layout=StaticLayout.Builder.obtain(rest,0,rest.length(),paint,width).setIncludePad(false).setLineSpacing(2*density,1).build();int line=0;
+   measure.setText(rest);measure.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));android.text.Layout layout=measure.getLayout();int line=0;
    while(line+1<layout.getLineCount()&&layout.getLineBottom(line+1)<=height)line++;
    int end=layout.getLineEnd(line);if(end<=0)end=Math.min(1,rest.length());pages.add(rest.substring(0,end).trim());rest=rest.substring(end).replaceFirst("^\\s+","");
   }
