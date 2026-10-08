@@ -27,7 +27,7 @@ public final class MainActivity extends Activity implements android.content.Shar
  @Override protected void onResume(){
   super.onResume();if(content!=null)draw();
   JSONObject cached=Renderer.obj(Repository.load(this),"market");
-  if(cached.optInt("schema")<4||System.currentTimeMillis()-cached.optLong("quote_at",cached.optLong("fetched_at"))>5*60_000L)
+  if(cached.optInt("schema")<5||System.currentTimeMillis()-cached.optLong("quote_at",cached.optLong("fetched_at"))>5*60_000L)
    main.postDelayed(()->{if(!isFinishing()&&!isDestroyed()&&!Repository.RUNNING.get())refresh();},350);
  }
 
@@ -37,7 +37,7 @@ public final class MainActivity extends Activity implements android.content.Shar
  Button button(String s,Runnable r){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(13);b.setOnClickListener(v->r.run());return b;}
  void draw(){
   int oldY=scroll.getScrollY();content.removeAllViews();content.addView(text("코인 시장 위젯",23,true));
-  content.addView(text("조회 전용 · 자동매매 프로그램과 별개 · v1.2.0",12,false));
+  content.addView(text("조회 전용 · 자동매매 프로그램과 별개 · v1.2.1",12,false));
   LinearLayout row=new LinearLayout(this);
   row.addView(button("홈 화면에 추가",this::pin),new LinearLayout.LayoutParams(0,dp(50),1));
   row.addView(button("API / 갱신 설정",()->SettingsUi.show(this)),new LinearLayout.LayoutParams(0,dp(50),1));content.addView(row);

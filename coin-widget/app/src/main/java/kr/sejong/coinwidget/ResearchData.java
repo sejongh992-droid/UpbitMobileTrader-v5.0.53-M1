@@ -22,48 +22,47 @@ final class ResearchData {
     }catch(Exception e){Repository.cancelCheck();failed++;if(failed>=5){error="통신 실패 누적: 일부 종목만 분석";break;}}
    }
   }catch(Exception e){Repository.cancelCheck();error="시간봉 조회 실패: 매수 검토 보류";}
-  all.sort((a,b)->{int d=Boolean.compare(b.optBoolean("qualified"),a.optBoolean("qualified"));return d!=0?d:Double.compare(b.optDouble("score"),a.optDouble("score"));});
-  JSONArray today=new JSONArray(),strict=new JSONArray();for(int i=0;i<all.size();i++){JSONObject a=all.get(i);if(i<Research.DISPLAY_LIMIT)today.put(a);if(a.optBoolean("qualified")&&strict.length()<Research.DISPLAY_LIMIT)strict.put(a);}
-  all.sort((a,b)->{int d=Boolean.compare(b.optBoolean("pre_qualified"),a.optBoolean("pre_qualified"));return d!=0?d:Double.compare(b.optDouble("morning_score"),a.optDouble("morning_score"));});
-  JSONArray morning=new JSONArray();int pre=0,pulseChecked=0,pulseFailed=0;
+  // Keep verified observations visible even when no coin passes every buy condition.
+  all.sort((a,b)->{int d=Boolean.compare(b.optBoolean("qualified"),a.optBoolean("qualified"));return d!=0?d:Double.compare(b.optDouble("morning_score"),a.optDouble("morning_score"));});
+  List<JSONObject> preWatch=new ArrayList<>();int pulseChecked=0,pulseFailed=0;
   for(JSONObject a:all){
    boolean base=a.optBoolean("pre_qualified"),dayBase=a.optBoolean("qualified");a.put("pre_qualified",false).put("qualified",false);
-   if(!dayBase||pulseChecked>=Research.DISPLAY_LIMIT)continue;pulseChecked++;
+   if(pulseChecked>=Research.DISPLAY_LIMIT){a.put("pulse_risk","단기 거래 확인 전");continue;}pulseChecked++;
    try{
     String code=Renderer.obj(a,"quote").getString("market");
     List<Signals.Bar> shortBars=Repository.readBars(new JSONArray(net.get("https://api.upbit.com/v1/candles/minutes/5?market="+code+"&count=30")));
     BeforeNine.Pulse pulse=BeforeNine.pulse(shortBars,now);
-    if(pulse==null||!pulse.passes)continue;
+    if(pulse==null){a.put("pulse_risk","완료 5분봉 자료 부족");continue;}
     a.put("pulse_ratio",pulse.ratio).put("pulse_change",pulse.change).put("pulse_through",pulse.through).put("pulse_rising",pulse.rising)
-     .put("qualified",true).put("pre_qualified",base).put("pre_state",BeforeNine.entryWindow(now)?"9시 전 매수 검토":"예비 후보 · 08시 이후 재검토")
-     .put("morning_score",Research.clamp(a.optDouble("morning_score")+Math.min(6,(pulse.ratio-1.3)*3)));
-    if(base&&morning.length()<Research.MORNING_LIMIT){morning.put(a);pre++;}
-   }catch(Exception e){Repository.cancelCheck();pulseFailed++;}
+     .put("qualified",dayBase&&pulse.passes).put("pre_qualified",base&&pulse.passes)
+     .put("pulse_risk",pulse.passes?"":pulse.ratio<1.3?"최근 15분 거래 증가 부족":pulse.change<.15?"최근 15분 상승 약함":pulse.change>3?"최근 15분 급등·추격 주의":"연속 상승 확인 부족")
+     .put("morning_score",Research.clamp(a.optDouble("morning_score")+Research.clamp((pulse.ratio-1)*6,-6,8)+Research.clamp(pulse.change*3,-12,6)));
+    preWatch.add(a);
+   }catch(Exception e){Repository.cancelCheck();pulseFailed++;a.put("pulse_risk","단기 봉 조회 실패");}
   }
-  // Rank only independently verified pre-09:00 candidates; never pad with watch-list entries.
-  List<JSONObject> ordered=new ArrayList<>();for(int i=0;i<morning.length();i++)ordered.add(morning.getJSONObject(i));
-  ordered.sort((a,b)->Double.compare(b.optDouble("morning_score"),a.optDouble("morning_score")));morning=new JSONArray();for(JSONObject a:ordered)morning.put(a);
-  all.sort((a,b)->Double.compare(b.optDouble("score"),a.optDouble("score")));strict=new JSONArray();for(JSONObject a:all)if(a.optBoolean("qualified")&&strict.length()<Research.DISPLAY_LIMIT)strict.put(a);
+  all.sort((a,b)->{int d=Boolean.compare(b.optBoolean("qualified"),a.optBoolean("qualified"));return d!=0?d:Double.compare(b.optDouble("score"),a.optDouble("score"));});
+  JSONArray today=new JSONArray(),strict=new JSONArray();for(JSONObject a:all){if(today.length()<Research.DISPLAY_LIMIT)today.put(a);if(a.optBoolean("qualified")&&strict.length()<Research.DISPLAY_LIMIT)strict.put(a);}
+  preWatch.sort((a,b)->{int d=Boolean.compare(b.optBoolean("pre_qualified"),a.optBoolean("pre_qualified"));return d!=0?d:Double.compare(b.optDouble("morning_score"),a.optDouble("morning_score"));});
+  JSONArray morning=new JSONArray(),morningWatch=new JSONArray();for(JSONObject a:preWatch){if(morningWatch.length()<Research.MORNING_LIMIT)morningWatch.put(a);if(a.optBoolean("pre_qualified")&&morning.length()<Research.MORNING_LIMIT)morning.put(a);}int pre=morning.length();
   List<JSONObject> longs=new ArrayList<>();int longInspected=0,longFailed=0;boolean longDefense=regime.startsWith("하락")||regime.startsWith("판단 보류");
-  if(!longDefense){
-   List<Signals.Quote> liquid=new ArrayList<>();for(Signals.Quote q:quotes)if(Signals.eligible(q,now)&&q.turnover>=1e10)liquid.add(q);
-   liquid.sort((a,b)->Double.compare(b.turnover,a.turnover));
-   for(Signals.Quote q:liquid.subList(0,Math.min(LongerTerm.SCAN_LIMIT,liquid.size()))){
-    try{
-     List<Signals.Bar> bars=Repository.readBars(new JSONArray(net.get("https://api.upbit.com/v1/candles/days?market="+q.market+"&count=160")));longInspected++;
-     LongerTerm.S s=LongerTerm.evaluate(q,bars,daily,now);if(s==null)continue;
-     longs.add(new JSONObject().put("quote",Repository.quoteJson(q)).put("qualified",true).put("score",s.score).put("rsi",s.rsi).put("atr_pct",s.atr/q.price*100)
-      .put("ma20",s.ma20).put("ma60",s.ma60).put("ma120",s.ma120).put("return30",s.ret30).put("relative30",s.relative30).put("volume_ratio",s.volumeRatio)
-      .put("support",s.low).put("resistance",s.high).put("entry_low",s.entryLow).put("entry_high",s.entryHigh).put("reference_rr",s.rr));
-    }catch(Exception e){Repository.cancelCheck();longFailed++;if(longFailed>=3)break;}
-   }
+  List<Signals.Quote> liquid=new ArrayList<>();for(Signals.Quote q:quotes)if(LongerTerm.pool(q,now))liquid.add(q);
+  liquid.sort((a,b)->Double.compare(b.turnover,a.turnover));
+  for(Signals.Quote q:liquid.subList(0,Math.min(LongerTerm.SCAN_LIMIT,liquid.size()))){
+   try{
+    List<Signals.Bar> bars=Repository.readBars(new JSONArray(net.get("https://api.upbit.com/v1/candles/days?market="+q.market+"&count=160")));longInspected++;
+    LongerTerm.S s=LongerTerm.evaluate(q,bars,daily,now);if(s==null)continue;
+    longs.add(new JSONObject().put("quote",Repository.quoteJson(q)).put("qualified",s.qualified&&!longDefense).put("score",s.score).put("rsi",s.rsi).put("atr_pct",s.atr/q.price*100)
+     .put("risk",longDefense?"BTC 일봉 약세·자료 확인 필요":s.risk).put("ma20",s.ma20).put("ma60",s.ma60).put("ma120",s.ma120).put("return30",s.ret30).put("relative30",s.relative30).put("volume_ratio",s.volumeRatio)
+     .put("support",s.low).put("resistance",s.high).put("entry_low",s.entryLow).put("entry_high",s.entryHigh).put("reference_rr",s.rr));
+   }catch(Exception e){Repository.cancelCheck();longFailed++;if(longFailed>=3)break;}
   }
-  longs.sort((a,b)->Double.compare(b.optDouble("score"),a.optDouble("score")));JSONArray longList=new JSONArray();for(int i=0;i<Math.min(LongerTerm.DISPLAY_LIMIT,longs.size());i++)longList.put(longs.get(i));
+  longs.sort((a,b)->{int d=Boolean.compare(b.optBoolean("qualified"),a.optBoolean("qualified"));return d!=0?d:Double.compare(b.optDouble("score"),a.optDouble("score"));});
+  JSONArray longList=new JSONArray(),longWatch=new JSONArray();for(JSONObject a:longs){if(longWatch.length()<LongerTerm.DISPLAY_LIMIT)longWatch.put(a);if(a.optBoolean("qualified")&&longList.length()<LongerTerm.DISPLAY_LIMIT)longList.put(a);}
   List<Signals.Bar>d=Signals.closed(daily,now,24*Signals.HOUR);JSONObject technical=new JSONObject();
   if(d.size()>=60){double hi=0,lo=Double.MAX_VALUE;for(int i=d.size()-20;i<d.size();i++){hi=Math.max(hi,d.get(i).high);lo=Math.min(lo,d.get(i).low);}technical.put("rsi",Signals.rsi(d,14)).put("ma20",Signals.sma(d,20)).put("ma60",Signals.sma(d,60)).put("high20",hi).put("low20",lo);}
   List<Signals.Bar>closed=Signals.closed(bh,now,Signals.HOUR);double b6=Signals.returnHours(closed,6);if(Signals.finite(b6))technical.put("return6h",b6);
-  return new JSONObject().put("defensive",defensive).put("defense_reason",defenseReason).put("schema",4).put("fetched_at",System.currentTimeMillis()).put("quote_at",now).put("btc",Repository.quoteJson(btc)).put("daily",Repository.barsJson(daily)).put("btc_technical",technical).put("btc_regime",regime)
-   .put("alt_total",(int)quotes.stream().filter(q->Signals.isAlt(q.market)).count()).put("quote_count",quotes.size()).put("breadth",Signals.finite(breadth)?breadth:JSONObject.NULL).put("advancing",up).put("alt_count",count).put("candidates",strict).put("watchlist",today).put("next_candidates",morning).put("pre_count",pre)
-   .put("long_candidates",longList).put("long_inspected",longInspected).put("long_failed",longFailed).put("long_defensive",longDefense).put("pulse_checked",pulseChecked).put("pulse_failed",pulseFailed).put("screened",pool.size()).put("inspected",inspected).put("invalid",invalid).put("failed",failed).put("screening_error",error+(failed>0?" · 실패 "+failed+"개":"")).put("recheck_at",Research.nextNine(now));
+  return new JSONObject().put("defensive",defensive).put("defense_reason",defenseReason).put("schema",5).put("fetched_at",System.currentTimeMillis()).put("quote_at",now).put("btc",Repository.quoteJson(btc)).put("daily",Repository.barsJson(daily)).put("btc_technical",technical).put("btc_regime",regime)
+   .put("alt_total",(int)quotes.stream().filter(q->Signals.isAlt(q.market)).count()).put("quote_count",quotes.size()).put("breadth",Signals.finite(breadth)?breadth:JSONObject.NULL).put("advancing",up).put("alt_count",count).put("candidates",strict).put("watchlist",today).put("next_candidates",morning).put("pre_watchlist",morningWatch).put("pre_count",pre)
+   .put("long_candidates",longList).put("long_watchlist",longWatch).put("long_inspected",longInspected).put("long_failed",longFailed).put("long_defensive",longDefense).put("pulse_checked",pulseChecked).put("pulse_failed",pulseFailed).put("screened",pool.size()).put("inspected",inspected).put("invalid",invalid).put("failed",failed).put("screening_error",error+(failed>0?" · 실패 "+failed+"개":"")).put("recheck_at",Research.nextNine(now));
  }
 }
