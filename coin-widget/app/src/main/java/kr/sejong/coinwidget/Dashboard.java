@@ -112,11 +112,14 @@ final class Dashboard {
   // Measure with the same TextView defaults as RemoteViews: Korean fallback fonts
   // and high-quality line breaking can be taller than a default StaticLayout.
   android.widget.TextView measure=new android.widget.TextView(c);measure.setTextSize(TypedValue.COMPLEX_UNIT_SP,15);measure.setIncludeFontPadding(false);measure.setLineSpacing(2*density,1);
-  List<String>pages=new ArrayList<>();int width=Math.max(80,(int)(widthDp*density)),height=Math.max(1,(int)((heightDp-4)*density));String rest=text;
+  List<String>pages=new ArrayList<>();int width=Math.max(80,(int)(widthDp*density)),height=Math.max(1,(int)((heightDp-4)*density));String rest=text;measure.setLayoutParams(new android.view.ViewGroup.LayoutParams(width,android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
   while(!rest.isEmpty()){
    measure.setText(rest);measure.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));android.text.Layout layout=measure.getLayout();int line=0;
    while(line+1<layout.getLineCount()&&layout.getLineBottom(line+1)<=height)line++;
-   int end=layout.getLineEnd(line);if(end<=0)end=Math.min(1,rest.length());pages.add(rest.substring(0,end).trim());rest=rest.substring(end).replaceFirst("^\\s+","");
+   int end=layout.getLineEnd(line);if(end<=0)end=Math.min(1,rest.length());
+   // A truncated paragraph can wrap differently; verify the exact page text too.
+   while(end>1){measure.setText(rest.substring(0,end).trim());measure.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));if(measure.getLayout().getHeight()<=height)break;int previous=end;int cut=measure.getLayout().getLineStart(Math.max(0,measure.getLayout().getLineCount()-1));end=cut>0?Math.min(end-1,cut):end-1;if(end>=previous)end=previous-1;}
+   pages.add(rest.substring(0,end).trim());rest=rest.substring(end).replaceFirst("^\\s+","");
   }
   if(pages.isEmpty())pages.add("자료가 없습니다. 새로고침하세요.");return pages;
  }
