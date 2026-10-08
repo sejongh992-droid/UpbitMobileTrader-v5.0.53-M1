@@ -3,7 +3,8 @@ on:
   push:
     branches: [coin-widget-build]
     paths:
-      - 'coin-widget/BUILD_READY'
+      - 'coin-widget/**'
+      - '.github/workflows/coin-widget.yml'
   workflow_dispatch:
 permissions:
   contents: read
@@ -21,6 +22,9 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
@@ -28,14 +32,17 @@ jobs:
         run: sdkmanager 'platforms;android-35' 'build-tools;34.0.0'
       - name: Source checks
         working-directory: coin-widget
-        run: bash tests/run_tests.sh
+        run: |
+          mkdir -p delivery
+          bash tests/run_tests.sh | tee delivery/source-checks.txt
+          git rev-parse HEAD > delivery/COMMIT.txt
+          git archive --format=zip --output=delivery/validated-source.zip HEAD coin-widget .github/workflows/coin-widget.yml
       - name: Compile release and Android tests; lint
         working-directory: coin-widget
         run: gradle --no-daemon :app:assembleRelease :app:assembleReleaseAndroidTest :app:lintRelease
       - name: Verify and collect APK
         working-directory: coin-widget
         run: |
-          mkdir -p delivery
           cp app/build/outputs/apk/release/app-release.apk delivery/CoinMarketWidget-1.0.1-ci.apk
           cp app/build/outputs/apk/androidTest/release/app-release-androidTest.apk delivery/tests.apk
           cp "$ANDROID_HOME/build-tools/34.0.0/lib/apksigner.jar" delivery/apksigner.jar
