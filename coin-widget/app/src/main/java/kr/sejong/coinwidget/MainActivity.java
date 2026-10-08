@@ -23,10 +23,14 @@ public final class MainActivity extends Activity implements android.content.Shar
   if(Build.VERSION.SDK_INT>=30){getWindow().setDecorFitsSystemWindows(false);scroll.setOnApplyWindowInsetsListener((view,insets)->{Insets p=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());view.setPadding(p.left,p.top,p.right,p.bottom);return insets;});}else scroll.setFitsSystemWindows(true);
   if(getIntent().hasExtra("view_mode"))Dashboard.move(this,0,getIntent().getIntExtra("view_mode",0)==1?1:0);
   getSharedPreferences("cache",0).registerOnSharedPreferenceChangeListener(this);Scheduler.ensure(this);draw();
-  JSONObject cached=Renderer.obj(Repository.load(this),"market");
-  if(cached.optInt("schema")<3||!cached.has("fetched_at")||System.currentTimeMillis()-cached.optLong("quote_at",cached.optLong("fetched_at"))>15*60_000L)main.postDelayed(()->{if(!isFinishing()&&!isDestroyed())refresh();},350);
  }
- @Override protected void onResume(){super.onResume();if(content!=null)draw();}
+ @Override protected void onResume(){
+  super.onResume();if(content!=null)draw();
+  JSONObject cached=Renderer.obj(Repository.load(this),"market");
+  if(cached.optInt("schema")<3||System.currentTimeMillis()-cached.optLong("quote_at",cached.optLong("fetched_at"))>15*60_000L)
+   main.postDelayed(()->{if(!isFinishing()&&!isDestroyed()&&!Repository.RUNNING.get())refresh();},350);
+ }
+
  @Override public void onSharedPreferenceChanged(android.content.SharedPreferences p,String key){if("snapshot".equals(key))main.post(()->{if(!isDestroyed())draw();});}
  @Override protected void onDestroy(){getSharedPreferences("cache",0).unregisterOnSharedPreferenceChangeListener(this);main.removeCallbacksAndMessages(null);super.onDestroy();}
  TextView text(String s,int size,boolean bold){TextView v=new TextView(this);v.setText(s);v.setTextSize(size);v.setTextColor(Charts.INK);v.setPadding(dp(4),dp(7),dp(4),dp(7));if(bold)v.setTypeface(null,android.graphics.Typeface.BOLD);return v;}

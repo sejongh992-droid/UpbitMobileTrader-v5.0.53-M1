@@ -68,6 +68,7 @@ final class Dashboard {
   if(height<680){v.setViewVisibility(R.id.next_day,View.GONE);v.setViewVisibility(R.id.chart_legend,View.GONE);v.setViewVisibility(R.id.btc_stats,View.GONE);}
   if(height<600)v.setViewVisibility(R.id.dom_meta,View.GONE);
   if(height<540)v.setViewVisibility(R.id.breadth,View.GONE);
+  if(height<360)v.setViewVisibility(R.id.warning,View.GONE);
   if(compact){v.setViewVisibility(R.id.btc_sub,View.GONE);v.setTextViewTextSize(R.id.btc_price,android.util.TypedValue.COMPLEX_UNIT_SP,22);}
   if(android.os.Build.VERSION.SDK_INT>=31)v.setViewLayoutHeight(R.id.btc_chart,height<540?30:height<640?48:72,android.util.TypedValue.COMPLEX_UNIT_DIP);
   if(compact){v.setViewVisibility(R.id.btc_chart,View.GONE);v.setViewVisibility(R.id.breadth,View.GONE);v.setViewVisibility(R.id.dom_chart,View.GONE);v.setViewVisibility(R.id.dom_meta,View.GONE);v.setViewVisibility(R.id.btc_stats,View.GONE);v.setViewVisibility(R.id.next_day,View.GONE);v.setViewVisibility(R.id.chart_legend,View.GONE);v.setViewVisibility(R.id.dom_title,View.GONE);}

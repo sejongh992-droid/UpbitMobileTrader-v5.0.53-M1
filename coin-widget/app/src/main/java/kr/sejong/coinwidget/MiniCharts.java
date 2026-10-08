@@ -11,6 +11,7 @@ final class MiniCharts {
   if(b.size()<2){c.drawText("새로고침 후 실제 일봉 표시",16,110,p(0xff738096,25));return bm;}
   int start=Math.max(0,b.size()-45),n=b.size()-start;double lo=Double.MAX_VALUE,hi=0;
   for(int i=start;i<b.size();i++){lo=Math.min(lo,b.get(i).low);hi=Math.max(hi,b.get(i).high);}
+  for(int i=start;i<b.size();i++)for(int period:new int[]{20,60})if(i>=period-1){double sum=0;for(int k=i-period+1;k<=i;k++)sum+=b.get(k).close;lo=Math.min(lo,sum/period);hi=Math.max(hi,sum/period);}
   double pad=Math.max((hi-lo)*.08,hi*.003);lo-=pad;hi+=pad;float top=13,bottom=164,right=595,step=(right-12)/n;
   for(int j=0;j<3;j++){float y=top+(bottom-top)*j/2;c.drawLine(12,y,right,y,p(0xffedf0f5,1));c.drawText(won(hi-(hi-lo)*j/2),605,y+9,p(0xff738096,22));}
   for(int i=start;i<b.size();i++){Signals.Bar a=b.get(i);float x=12+(i-start+.5f)*step;Paint q=p(a.close>=a.open?0xffdc4d65:0xff357bc4,1);q.setStrokeWidth(2);
