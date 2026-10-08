@@ -39,6 +39,7 @@ jobs:
         run: |
           mkdir -p delivery
           python3 tools/apply_v110.py
+          python3 tools/polish_v110.py
           bash tests/run_tests.sh | tee delivery/source-checks.txt
           git rev-parse HEAD > delivery/COMMIT.txt
           zip -qr delivery/validated-source.zip app/src app/build.gradle build.gradle settings.gradle gradle.properties tests tools README_KO.md
