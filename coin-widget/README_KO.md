@@ -1,9 +1,36 @@
-# 코인 시장 위젯 1.1.0
+# 코인 시장 위젯 1.1.1
 
-새로 체크아웃한 저장소에서는 `python3 tools/apply_v110.py`, `python3 tools/polish_v110.py`, `python3 tools/fit_v110.py`를 순서대로 각각 한 번 실행하고 Gradle로 빌드합니다. GitHub Actions는 자동 수행합니다. 배포된 `validated-source.zip`은 이미 변환·검증된 실제 컴파일 소스이므로 변환 스크립트를 다시 실행하지 말고 Gradle로 바로 빌드합니다.
+패키지 kr.sejong.coinwidget / versionCode 4 / minSdk 26 / compile·targetSdk 35.
 
-한글명·티커·가격·등락률, 오늘 관심 최대30개 및 다음09시 이전 검토 최대15개, 페이지와 탭 전환, 최대60종목 시간봉 분석, 비트코인 상세 지표, 도미넌스 비중 비교와 해석, 외부 과거 차트 연결을 추가했습니다. 위젯 높이에 맞춰 한 페이지 1~5개를 표시합니다.
+## 빌드
+JDK 17, Gradle 8.9, Android Gradle Plugin 8.7.3, SDK 35.
+coin-widget 폴더에서 `gradle :app:assembleRelease :app:assembleReleaseAndroidTest :app:lintRelease`.
+원본 Java·XML을 그대로 빌드합니다. 소스 변환 스크립트가 필요하지 않습니다.
+`bash tests/run_tests.sh`는 순수 계산 검사 및 소스·리소스 검사를 수행합니다.
+CI 인증서는 검사 전용입니다. 배포 APK는 기존 비공개 업데이트 인증서로 별도 서명합니다. 개인 키를 저장소에 올리지 마세요.
 
-점수는 예측 확률이 아닙니다. 매수 검토 조건 통과와 확인대기를 구분하며, 후보 수를 채우기 위해 매수 조건을 통과했다고 표시하지 않습니다. 미래 수익률·급등 보장, 자동 주문, 잔고 조회는 없습니다. 앱의 도미넌스 이력은 실제 관측만 사용하며 외부 TradingView BTC.D와는 공급자가 다릅니다.
+## 표시와 해석
+업비트 원화 시세, 일봉, 완료 시간봉에 근거한 조회 전용 앱입니다. 주문 기능은 없습니다.
+오늘 관심 목록 최대 30개, 다음 09시 재확인 최대 15개. 실제 분석은 1차 선별 상위 최대 60개입니다.
+관찰 대기와 조건 충족은 다릅니다. 조회 당시 조건을 통과해야 조건 충족으로 표시합니다.
+점수는 순위용 규칙 점수이며 상승 확률 또는 수익 보장이 아닙니다.
+앱의 ‘화면 읽는 법 · 쉬운 설명’에서 지표와 사용 순서를 확인할 수 있습니다.
 
-CI 설치·실행 검사는 임시 검사 인증서로 서명한 release APK를 사용합니다. 최종 APK는 코드·리소스를 바꾸지 않고 기존 비공개 배포키로 로컬 재서명하며 양쪽 내용과 인증서를 확인합니다. 개인 서명키·사용자 API 키는 저장소에 없습니다. 삼성 실물·실제 2시간 경과·수익성 백테스트는 별도 검증 사항입니다. main은 수정하지 않습니다.
+## 데이터 검사
+현재가와 전일 종가로 등락률을 재계산해 API 등락률과 대조합니다.
+중복·누락 시세, 음수 거래대금, 불완전 시간봉, 오래된 봉은 배제합니다.
+전일 대비는 KST 09시 기준입니다. 24시간 거래대금과 기간이 다릅니다.
+BTC 일봉 추세 확인 불가·일봉 하락·알트 상승비율 35% 미만·BTC 직전 완료 시간봉 1.2% 초과 하락 시 방어 관찰합니다.
+도미넌스는 CoinPaprika 기본, CoinGecko 선택이며 동일 공급자 실측 기록만 비교합니다.
+약24시간 변화는 21~27시간 전 가장 가까운 관측과의 %p 차이입니다.
+환율은 Frankfurter/ECB 일별 기준 환율로 현재 환전 시세가 아닙니다.
+
+## 공식 자료
+https://docs.upbit.com/kr/reference/list-quote-tickers
+https://docs.upbit.com/kr/reference/list-candles-minutes
+https://docs.coinpaprika.com/api-reference/global/get-market-overview-data
+https://frankfurter.dev/
+https://developer.android.com/develop/ui/views/appwidgets/advanced
+
+## 검사 범위
+합성 계산 검사는 수익성 백테스트가 아닙니다. Android 실행 검사의 수치 및 실물 단말 미확인 사항은 전달 점검결과를 따릅니다.

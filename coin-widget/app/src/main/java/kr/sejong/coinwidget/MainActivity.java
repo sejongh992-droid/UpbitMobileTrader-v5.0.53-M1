@@ -21,9 +21,10 @@ public final class MainActivity extends Activity implements android.content.Shar
   content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(dp(14),dp(14),dp(14),dp(20));
   scroll.addView(content,new ScrollView.LayoutParams(-1,-2));setContentView(scroll);
   if(Build.VERSION.SDK_INT>=30){getWindow().setDecorFitsSystemWindows(false);scroll.setOnApplyWindowInsetsListener((view,insets)->{Insets p=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());view.setPadding(p.left,p.top,p.right,p.bottom);return insets;});}else scroll.setFitsSystemWindows(true);
+  if(getIntent().hasExtra("view_mode"))Dashboard.move(this,0,getIntent().getIntExtra("view_mode",0)==1?1:0);
   getSharedPreferences("cache",0).registerOnSharedPreferenceChangeListener(this);Scheduler.ensure(this);draw();
   JSONObject cached=Renderer.obj(Repository.load(this),"market");
-  if(!cached.has("fetched_at")||System.currentTimeMillis()-cached.optLong("fetched_at")>2*Signals.HOUR)main.postDelayed(()->{if(!isFinishing()&&!isDestroyed())refresh();},350);
+  if(cached.optInt("schema")<3||!cached.has("fetched_at")||System.currentTimeMillis()-cached.optLong("quote_at",cached.optLong("fetched_at"))>15*60_000L)main.postDelayed(()->{if(!isFinishing()&&!isDestroyed())refresh();},350);
  }
  @Override protected void onResume(){super.onResume();if(content!=null)draw();}
  @Override public void onSharedPreferenceChanged(android.content.SharedPreferences p,String key){if("snapshot".equals(key))main.post(()->{if(!isDestroyed())draw();});}
@@ -32,18 +33,19 @@ public final class MainActivity extends Activity implements android.content.Shar
  Button button(String s,Runnable r){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(13);b.setOnClickListener(v->r.run());return b;}
  void draw(){
   int oldY=scroll.getScrollY();content.removeAllViews();content.addView(text("코인 시장 위젯",23,true));
-  content.addView(text("조회 전용 · 자동매매 프로그램과 별개 · v1.0.1",12,false));
+  content.addView(text("조회 전용 · 자동매매 프로그램과 별개 · v1.1.1",12,false));
   LinearLayout row=new LinearLayout(this);
   row.addView(button("홈 화면에 추가",this::pin),new LinearLayout.LayoutParams(0,dp(50),1));
   row.addView(button("API / 갱신 설정",()->SettingsUi.show(this)),new LinearLayout.LayoutParams(0,dp(50),1));content.addView(row);
   try{
-   View card=Renderer.build(this,false).apply(this,content);
-   for(int id:new int[]{R.id.btc_chart,R.id.dom_chart}){View chart=card.findViewById(id);LinearLayout.LayoutParams cp=(LinearLayout.LayoutParams)chart.getLayoutParams();cp.height=dp(id==R.id.btc_chart?100:62);cp.weight=0;chart.setLayoutParams(cp);}
-   card.findViewById(R.id.refresh).setOnClickListener(v->refresh());card.findViewById(R.id.open_app).setOnClickListener(v->SettingsUi.show(this));
+   View card=Dashboard.build(this,660,0).apply(this,content);
+   for(int action=0;action<4;action++){final int which=action;card.findViewById(new int[]{R.id.tab_today,R.id.tab_morning,R.id.page_prev,R.id.page_next}[action]).setOnClickListener(v->{Dashboard.move(this,0,which);draw();});}
+   card.findViewById(R.id.refresh).setOnClickListener(v->refresh());card.findViewById(R.id.open_app).setOnClickListener(v->scroll.smoothScrollTo(0,card.getBottom()+dp(10)));
    card.findViewById(R.id.btc_chart).setOnClickListener(v->openChart("KRW-BTC"));card.findViewById(R.id.btc_price).setOnClickListener(v->openChart("KRW-BTC"));
    LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=dp(10);content.addView(card,p);
   }catch(RuntimeException e){content.addView(text("위젯 미리보기를 표시하지 못했습니다. 새로고침 후 다시 확인하세요.",14,false));}
-  DetailUi.add(this,content,Repository.load(this));
+  content.addView(button("화면 읽는 법 · 쉬운 설명",()->HelpUi.show(this)));
+  WatchDetails.add(this,content,Repository.load(this));
   content.addView(button("앱·배터리 설정 열기",()->{try{startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName())));}catch(Exception e){toast("휴대폰 설정에서 이 앱을 찾아주세요.");}}));
   if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)content.addView(button("새로고침 진행 알림 허용",()->requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},40)));
   main.post(()->scroll.scrollTo(0,oldY));

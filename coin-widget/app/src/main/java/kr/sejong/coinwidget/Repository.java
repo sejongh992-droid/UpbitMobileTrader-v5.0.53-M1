@@ -20,6 +20,7 @@ final class Repository {
     JSONObject raw=new JSONObject(net.get("https://api.frankfurter.dev/v2/providers/ecb/rate/usd/krw"));
     double rate=raw.getDouble("rate");String date=raw.getString("date");
     if(!Signals.finite(rate)||rate<=0||!date.matches("\\d{4}-\\d{2}-\\d{2}"))throw new IOException("환율 응답 형식 오류");
+    if(LocalDate.parse(date).isAfter(LocalDate.now(ZoneOffset.UTC)))throw new IOException("미래 기준일 환율 응답");
     root.put("fx",new JSONObject().put("rate",rate).put("date",date).put("fetched_at",System.currentTimeMillis())).put("fx_failed",false);
    }catch(Exception e){cancelCheck();root.put("fx_failed",true);errors.put("환율: "+safe(e));}
    cancelCheck();root.put("errors",errors).put("last_finished",System.currentTimeMillis());

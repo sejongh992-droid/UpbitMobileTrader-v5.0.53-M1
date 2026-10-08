@@ -50,6 +50,12 @@ public final class SignalsTest {
   check(Signals.altRegime(Double.NaN,"상승 우세",-.3).equals("판단 보류"),"missing breadth defers judgment");
   check(Signals.btcRegime(Double.NaN,days,dayNow).startsWith("판단 보류"),"invalid BTC price defers judgment");
   List<Signals.Bar>olderGap=new ArrayList<>(wave);olderGap.remove(30);check(Signals.analyze(q,olderGap,flat,now)==null,"gap inside 60-bar average rejected");
+  check(!Signals.hourlyContinuous(up,now+H,24),"reject previous-hour stale bars");
+  check(!Signals.hourlyContinuous(up,now-1,24),"reject unclosed latest bar");
+  List<Signals.Bar>dayGap=new ArrayList<>(days);dayGap.remove(70);
+  check(Signals.btcRegime(191,dayGap,dayNow).startsWith("판단 보류"),"reject missing day inside moving average");
+  check(Signals.btcRegime(191,days,dayNow+24*H).startsWith("판단 보류"),"reject previous-day stale bars");
+  check(Signals.altRegime(80,"판단 보류(일봉 부족)",-.5).equals("판단 보류"),"unknown BTC trend cannot endorse alt strength");
   System.out.println("TOTAL "+tests+" passed; synthetic unit tests only.");
  }
 }

@@ -3,7 +3,7 @@ import android.graphics.*;
 import org.json.*;
 import java.util.*;
 final class MiniCharts {
- static Paint p(int color,float size){Paint p=new Paint(3);p.setColor(color);p.setTextSize(size);p.setTypeface(Typeface.create("sans-serif",0));return p;}
+ static Paint p(int color,float size){Paint p=new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);p.setColor(color);p.setTextSize(size);p.setTypeface(Typeface.create("sans-serif",Typeface.NORMAL));return p;}
  static String won(double n){return n>=1e8?String.format(Locale.KOREA,"%.2f억",n/1e8):n>=10000?String.format(Locale.KOREA,"%,.0f만",n/10000):Charts.number(n);}
  static Bitmap btc(JSONArray data){
   Bitmap bm=Bitmap.createBitmap(720,200,Bitmap.Config.ARGB_8888);Canvas c=new Canvas(bm);c.drawColor(Color.WHITE);List<Signals.Bar>b;

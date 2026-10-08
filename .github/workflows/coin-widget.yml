@@ -1,7 +1,7 @@
 name: Coin widget APK and Android checks
 on:
   push:
-    branches: [coin-widget-build]
+    branches: [coin-widget-v111]
     paths:
       - 'coin-widget/**'
       - '.github/workflows/coin-widget.yml'
@@ -38,24 +38,21 @@ jobs:
         working-directory: coin-widget
         run: |
           mkdir -p delivery
-          python3 tools/apply_v110.py
-          python3 tools/polish_v110.py
-          python3 tools/fit_v110.py
           bash tests/run_tests.sh | tee delivery/source-checks.txt
           git rev-parse HEAD > delivery/COMMIT.txt
-          zip -qr delivery/validated-source.zip app/src app/build.gradle build.gradle settings.gradle gradle.properties tests tools README_KO.md
+          zip -qr delivery/validated-source.zip app/src app/build.gradle build.gradle settings.gradle gradle.properties tests README_KO.md
       - name: Compile release and Android tests; lint
         working-directory: coin-widget
         run: gradle --no-daemon :app:assembleRelease :app:assembleReleaseAndroidTest :app:lintRelease
       - name: Verify and collect APK
         working-directory: coin-widget
         run: |
-          cp app/build/outputs/apk/release/app-release.apk delivery/CoinMarketWidget-1.1.0-ci.apk
+          cp app/build/outputs/apk/release/app-release.apk delivery/CoinMarketWidget-1.1.1-ci.apk
           cp app/build/outputs/apk/androidTest/release/app-release-androidTest.apk delivery/tests.apk
           cp "$ANDROID_HOME/build-tools/34.0.0/lib/apksigner.jar" delivery/apksigner.jar
-          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose --print-certs delivery/CoinMarketWidget-1.1.0-ci.apk | tee delivery/signature-ci.txt
-          "$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging delivery/CoinMarketWidget-1.1.0-ci.apk > delivery/apk-badging.txt
-          unzip -t delivery/CoinMarketWidget-1.1.0-ci.apk
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose --print-certs delivery/CoinMarketWidget-1.1.1-ci.apk | tee delivery/signature-ci.txt
+          "$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging delivery/CoinMarketWidget-1.1.1-ci.apk > delivery/apk-badging.txt
+          unzip -t delivery/CoinMarketWidget-1.1.1-ci.apk
           sha256sum delivery/*.apk delivery/apksigner.jar > delivery/SHA256SUMS.txt
       - name: Upload installable build and test tools
         uses: actions/upload-artifact@v4

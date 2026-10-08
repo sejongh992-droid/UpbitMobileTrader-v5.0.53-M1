@@ -66,6 +66,6 @@ final class Charts {
         c.drawText(date((long)first,"MM/dd HH:mm"),8,107,paint(MUTED,13));c.drawText(date((long)last,"MM/dd HH:mm"),450,107,paint(MUTED,13));return b;
     }
     static String date(long t,String pattern){if(t<=0)return "—";return Instant.ofEpochMilli(t).atZone(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern(pattern,Locale.KOREA));}
-    static String number(double v){if(!Signals.finite(v))return "—";return new DecimalFormat(v>=100?"#,##0":v>=1?"#,##0.00":"0.####").format(v);}
+    static String number(double v){if(!Signals.finite(v))return "—";return new DecimalFormat("#,##0.########").format(v);}
     static String pct(double v){return Signals.finite(v)?String.format(Locale.KOREA,"%+.2f%%",v):"—";}
 }

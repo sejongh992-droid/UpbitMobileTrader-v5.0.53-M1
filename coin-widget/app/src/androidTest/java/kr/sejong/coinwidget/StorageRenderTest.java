@@ -24,7 +24,7 @@ public class StorageRenderTest {
   assertEquals(1704067200000L,Repository.readBars(new JSONArray(raw)).get(0).time);
  }
  @Test public void staleAndFailedMarketSuppressed()throws Exception{
-  JSONObject m=new JSONObject().put("fetched_at",System.currentTimeMillis());JSONObject root=new JSONObject().put("market",m);
+  JSONObject m=new JSONObject().put("schema",3).put("fetched_at",System.currentTimeMillis());JSONObject root=new JSONObject().put("market",m);
   assertTrue(Renderer.freshMarket(root));root.put("market_failed",true);assertFalse(Renderer.freshMarket(root));root.put("market_failed",false);
   m.put("fetched_at",System.currentTimeMillis()-4*Signals.HOUR);assertFalse(Renderer.freshMarket(root));
  }
@@ -50,7 +50,7 @@ public class StorageRenderTest {
  }
  @Test public void noConcurrentRefresh()throws Exception{Repository.RUNNING.set(true);assertFalse(Repository.refresh(c));}
  @Test public void errorRecordingInvalidatesOldCandidates()throws Exception{
-  c.getSharedPreferences("cache",0).edit().putString("snapshot",new JSONObject().put("market",new JSONObject().put("fetched_at",System.currentTimeMillis())).toString()).commit();
+  c.getSharedPreferences("cache",0).edit().putString("snapshot",new JSONObject().put("market",new JSONObject().put("schema",3).put("fetched_at",System.currentTimeMillis())).toString()).commit();
   assertTrue(Renderer.freshMarket(Repository.load(c)));Repository.recordFailure(c,"TEST_FAILURE");assertFalse(Renderer.freshMarket(Repository.load(c)));assertEquals("TEST_FAILURE",Repository.load(c).getJSONArray("errors").getString(0));
  }
  @Test public void immutableActivityIntent(){assertTrue(Renderer.activity(c,909,new Intent(c,MainActivity.class)).isImmutable());}

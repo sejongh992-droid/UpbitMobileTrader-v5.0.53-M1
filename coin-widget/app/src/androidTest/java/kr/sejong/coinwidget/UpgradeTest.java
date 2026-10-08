@@ -32,7 +32,7 @@ public class UpgradeTest {
  }
  JSONObject fixture()throws Exception{
   long now=System.currentTimeMillis();JSONArray list=new JSONArray();for(int i=0;i<20;i++)list.put(new JSONObject().put("quote",new JSONObject().put("name","라이브피어").put("market","KRW-LPT").put("price",12340).put("day_pct",2.1)).put("score",83-i).put("morning_score",80-i).put("state","확인 대기").put("pre_state","09시 전 재확인"));
-  JSONObject m=new JSONObject().put("schema",2).put("quote_at",now).put("fetched_at",now).put("btc",new JSONObject().put("price",112400000).put("day_pct",-1.01)).put("btc_regime","조정·혼조").put("breadth",34.3).put("watchlist",list).put("next_candidates",list).put("recheck_at",Research.nextNine(now));return new JSONObject().put("market",m);
+  JSONObject m=new JSONObject().put("schema",3).put("quote_at",now).put("fetched_at",now).put("btc",new JSONObject().put("price",112400000).put("day_pct",-1.01)).put("btc_regime","조정·혼조").put("breadth",34.3).put("watchlist",list).put("next_candidates",list).put("recheck_at",Research.nextNine(now));return new JSONObject().put("market",m).put("fx",new JSONObject().put("rate",1343.46).put("date","2026-10-08")).put("dominance",new JSONObject().put("value",56.75).put("time",now).put("source","TEST DATA"));
  }
  @Test public void namesPagingAndExpiredMorning()throws Exception{
   c.getSharedPreferences("cache",0).edit().putString("snapshot",fixture().toString()).commit();c.getSharedPreferences("widget_ui",0).edit().clear().commit();
@@ -44,16 +44,27 @@ public class UpgradeTest {
   JSONObject r=fixture();r.getJSONObject("market").put("recheck_at",System.currentTimeMillis()-1);c.getSharedPreferences("cache",0).edit().putString("snapshot",r.toString()).commit();
   InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{View v=Dashboard.build(c,760,999).apply(c,new FrameLayout(c));assertNotNull(v.findViewById(R.id.empty_label));assertEquals(1,((LinearLayout)v.findViewById(R.id.coin_rows)).getChildCount());});
  }
+ @Test public void navigationBroadcastAndDetailTabHandoff()throws Exception{
+  c.getSharedPreferences("cache",0).edit().putString("snapshot",fixture().toString()).commit();
+  Dashboard.move(c,818,0);Dashboard.nav(c,818,1).send();
+  long navStart=SystemClock.elapsedRealtime();while(Dashboard.mode(c,818)!=1&&SystemClock.elapsedRealtime()-navStart<8000)SystemClock.sleep(50);
+  InstrumentationRegistry.getInstrumentation().waitForIdleSync();android.util.Log.i("WidgetNav","deliveryMs="+(SystemClock.elapsedRealtime()-navStart));
+  assertEquals(1,Dashboard.mode(c,818));
+  try(androidx.test.core.app.ActivityScenario<MainActivity> scenario=androidx.test.core.app.ActivityScenario.launch(new Intent(c,MainActivity.class).putExtra("view_mode",1))){
+   scenario.onActivity(a->{assertEquals(1,Dashboard.mode(a,0));assertNotNull(a.findViewById(R.id.tab_morning));});
+  }
+ }
  @Test public void measuredWidgetContentFits()throws Exception{
   c.getSharedPreferences("cache",0).edit().putString("snapshot",fixture().toString()).commit();
   InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
-   float den=c.getResources().getDisplayMetrics().density;
+   float den=c.getResources().getDisplayMetrics().density;StringBuilder boundsErrors=new StringBuilder();
    for(int h:new int[]{380,480,600,760}){
     View v=Dashboard.build(c,h,10).apply(c,new FrameLayout(c));v.measure(View.MeasureSpec.makeMeasureSpec((int)(340*den),View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec((int)(h*den),View.MeasureSpec.EXACTLY));v.layout(0,0,v.getMeasuredWidth(),v.getMeasuredHeight());
     View button=v.findViewById(R.id.refresh);int bottom=button.getBottom();View parent=(View)button.getParent();while(parent!=v){bottom+=parent.getTop();parent=(View)parent.getParent();}
     try{Bitmap bm=Bitmap.createBitmap(v.getMeasuredWidth(),v.getMeasuredHeight(),Bitmap.Config.ARGB_8888);v.draw(new android.graphics.Canvas(bm));java.io.File dir=new java.io.File(c.getExternalFilesDir(null),"test-results");dir.mkdirs();try(java.io.FileOutputStream out=new java.io.FileOutputStream(new java.io.File(dir,"synthetic-layout-"+h+".png"))){bm.compress(Bitmap.CompressFormat.PNG,100,out);}}catch(Exception e){throw new AssertionError(e);}
-    android.util.Log.i("WidgetBounds","height="+h+" footerBottom="+(bottom/den));assertTrue("Footer clipped at "+h+"dp: "+(bottom/den),bottom<=h*den);
+    android.util.Log.i("WidgetBounds","height="+h+" footerBottom="+(bottom/den));if(bottom>h*den-v.getPaddingBottom() || button.getHeight()<36*den || ((View)button.getParent()).getHeight()<40*den)boundsErrors.append("height=").append(h).append(" bottom=").append(bottom/den).append(" buttonHeight=").append(button.getHeight()/den).append("; ");
    }
+   assertTrue("Widget bounds: "+boundsErrors,boundsErrors.length()==0);
   });
  }
 }

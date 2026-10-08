@@ -20,9 +20,9 @@ final class Research {
   s.high=0;s.low=Double.MAX_VALUE;for(int i=b.size()-20;i<b.size();i++)s.high=Math.max(s.high,b.get(i).high);for(int i=b.size()-12;i<b.size();i++)s.low=Math.min(s.low,b.get(i).low);
   boolean trend=q.price>=s.ma20&&s.ma20>=s.ma60;double ap=s.atr/q.price*100;
   s.score=clamp(30+(trend?18:0)+clamp(s.rel6*3,-12,16)+clamp((s.ratio-.5)*10,-5,15)+(s.rsi>=45&&s.rsi<=68?12:0)+clamp((Math.log10(q.turnover)-9)*5,0,10)-Math.max(0,ap-3)*5-Math.max(0,q.dayPct-15));
-  s.qualified=Signals.analyze(q,raw,btcRaw,now)!=null&&!defensive;
-  s.state=s.qualified?"매수 검토":s.rsi>76||q.dayPct>20?"추격 주의":defensive?"시장 방어·대기":trend?"확인 대기":"추세 회복 대기";
-  s.reason=String.format(Locale.KOREA,"BTC 대비 6h %+.1f%%p · 거래대금 %.1f배",s.rel6,s.ratio);
+  s.qualified=Signals.analyze(q,raw,btcRaw,now)!=null&&s.score>=60&&!defensive;
+  s.state=s.qualified?"조건 충족·재확인":s.rsi>76||q.dayPct>20?"추격 주의":defensive?"시장 방어·대기":trend?"확인 대기":"추세 회복 대기";
+  s.reason=String.format(Locale.KOREA,"같은 6시간 동안 BTC보다 %s %.1f%%p · 직전 1시간 거래대금은 이전 20시간 평균의 %.1f배",s.rel6>=0?"강함":"약함",Math.abs(s.rel6),s.ratio);
   // Reference band around a measured moving average, never above the observed quote.
   s.entryHi=Math.min(q.price,s.ma20+.25*s.atr);s.entryLo=Math.min(s.entryHi,s.ma20-.35*s.atr);
   double middle=(s.entryLo+s.entryHi)/2,loss=middle-s.low;

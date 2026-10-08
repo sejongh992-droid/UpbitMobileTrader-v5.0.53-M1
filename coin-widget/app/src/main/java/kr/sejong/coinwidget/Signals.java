@@ -30,7 +30,7 @@ public final class Signals {
  }
  public static double atr(List<Bar>b,int p){if(p<=0||b.size()<p+1)return Double.NaN;double v=0;for(int i=1;i<=p;i++)v+=tr(b.get(i),b.get(i-1).close);v/=p;for(int i=p+1;i<b.size();i++)v=(v*(p-1)+tr(b.get(i),b.get(i-1).close))/p;return v;}
  private static double tr(Bar b,double prev){return Math.max(b.high-b.low,Math.max(Math.abs(b.high-prev),Math.abs(b.low-prev)));}
- public static boolean hourlyContinuous(List<Bar>b,long now,int count){if(b.size()<count||now-(b.get(b.size()-1).time+HOUR)>90*60_000L)return false;for(int i=b.size()-count+1;i<b.size();i++)if(b.get(i).time-b.get(i-1).time!=HOUR)return false;return true;}
+ public static boolean hourlyContinuous(List<Bar>b,long now,int count){if(b.size()<count||now-(b.get(b.size()-1).time+HOUR)>=HOUR||now<(b.get(b.size()-1).time+HOUR))return false;for(int i=b.size()-count+1;i<b.size();i++)if(b.get(i).time-b.get(i-1).time!=HOUR)return false;return true;}
  public static double returnHours(List<Bar>b,int hours){if(b.size()<=hours)return Double.NaN;int n=b.size()-1;if(b.get(n).time-b.get(n-hours).time!=hours*HOUR)return Double.NaN;return (b.get(n).close/b.get(n-hours).close-1)*100;}
  public static double screeningScore(Quote q,double btcDay){return Math.log10(Math.max(q.turnover,1))*3+(q.dayPct-btcDay)*1.4-Math.max(0,q.dayPct-12)*2;}
  public static Candidate analyze(Quote q,List<Bar>input,List<Bar>btcInput,long now){
@@ -51,9 +51,10 @@ public final class Signals {
  }
  public static String btcRegime(double price,List<Bar>bars,long now){
   if(!finite(price)||price<=0)return "판단 보류(시세 오류)";List<Bar>b=closed(bars,now,24*HOUR);
-  if(b.size()<60||now-(b.get(b.size()-1).time+24*HOUR)>36*HOUR)return "판단 보류(일봉 부족)";
+  if(b.size()<60||now-(b.get(b.size()-1).time+24*HOUR)>=24*HOUR)return "판단 보류(일봉 부족)";
+  for(int i=b.size()-59;i<b.size();i++)if(b.get(i).time-b.get(i-1).time!=24*HOUR)return "판단 보류(일봉 누락)";
   double m20=sma(b,20),m60=sma(b,60);if(price>m20&&m20>m60)return "상승 우세";if(price<m20&&m20<m60)return "하락 우세";return "조정·혼조";
  }
  public static double dominanceDelta24(long currentTime,double current,List<double[]>history){double val=Double.NaN;long distance=Long.MAX_VALUE;for(double[]p:history){if(p.length<2||!finite(p[1]))continue;long d=Math.abs((long)p[0]-(currentTime-24*HOUR));if(d<=3*HOUR&&d<distance&&p[0]<currentTime){distance=d;val=p[1];}}return finite(val)?current-val:Double.NaN;}
- public static String altRegime(double breadth,String btc,double domDelta){if(!finite(breadth))return "판단 보류";if(breadth<35||btc.startsWith("하락"))return "약세·방어 관찰";if(breadth>=65&&btc.startsWith("상승")&&finite(domDelta)&&domDelta<=-0.2)return "알트 강세 조건 일부 충족";if(breadth>=65)return "상승 종목 확산(불장 확정 아님)";return "선별·혼조";}
+ public static String altRegime(double breadth,String btc,double domDelta){if(!finite(breadth)||btc==null||btc.startsWith("판단 보류"))return "판단 보류";if(breadth<35||btc.startsWith("하락"))return "약세·방어 관찰";if(breadth>=65&&btc.startsWith("상승")&&finite(domDelta)&&domDelta<=-0.2)return "알트 강세 조건 일부 충족";if(breadth>=65)return "상승 종목 확산(불장 확정 아님)";return "선별·혼조";}
 }

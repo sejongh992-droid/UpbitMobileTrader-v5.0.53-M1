@@ -26,7 +26,7 @@ public class WidgetHostTest {
   Scheduler.cancel(c);c.getSharedPreferences("settings",0).edit().putBoolean("auto",false).commit();
   long now=System.currentTimeMillis();List<Signals.Bar> bars=new ArrayList<>();
   for(int i=0;i<90;i++){double p=100000000+i*100000;bars.add(new Signals.Bar(now-(90-i)*24*Signals.HOUR,p,p+1000000,p-1000000,p+200000,100));}
-  JSONObject market=new JSONObject().put("fetched_at",now).put("btc",new JSONObject().put("price",109000000).put("day_pct",1.2)).put("daily",Repository.barsJson(bars)).put("btc_regime","테스트 자료").put("breadth",50);
+  JSONObject market=new JSONObject().put("schema",3).put("fetched_at",now).put("btc",new JSONObject().put("price",109000000).put("day_pct",1.2)).put("daily",Repository.barsJson(bars)).put("btc_regime","테스트 자료").put("breadth",50);
   JSONArray hist=new JSONArray().put(new JSONArray().put(now-2*Signals.HOUR).put(57.1)).put(new JSONArray().put(now).put(56.9));
   JSONObject dom=new JSONObject().put("value",56.9).put("time",now).put("source","TEST DATA").put("history",hist);
   JSONObject root=new JSONObject().put("market",market).put("dominance",dom);

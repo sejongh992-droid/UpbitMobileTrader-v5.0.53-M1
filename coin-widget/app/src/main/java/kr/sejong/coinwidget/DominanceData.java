@@ -14,12 +14,12 @@ final class DominanceData {
    source="CoinPaprika";JSONObject d=new JSONObject(net.get("https://api.coinpaprika.com/v1/global"));
    value=d.getDouble("bitcoin_dominance_percentage");capChange=d.optDouble("market_cap_change_24h",Double.NaN);time=d.getLong("last_updated")*1000L;
   }
-  if(!Signals.finite(value)||value<=0||value>=100||time<=0||time>System.currentTimeMillis()+5*60_000L)throw new IOException("도미넌스 응답 값 오류");
+  if(!Signals.finite(value)||value<=0||value>=100||time<=0||time>System.currentTimeMillis()+60_000L||System.currentTimeMillis()-time>3*Signals.HOUR)throw new IOException("도미넌스 응답 값 오류");
   JSONArray previous=(old!=null&&source.equals(old.optString("source")))?old.optJSONArray("history"):null;
   TreeMap<Long,double[]> points=new TreeMap<>();
   if(previous!=null)for(int i=0;i<previous.length();i++){
    JSONArray p=previous.optJSONArray(i);if(p==null||p.length()<2)continue;long t=p.optLong(0);double v=p.optDouble(1);
-   if(t>time-14*24*Signals.HOUR&&t<=time&&Signals.finite(v))points.put(t/(2*Signals.HOUR),new double[]{t,v});
+   if(t>time-14*24*Signals.HOUR&&t<=time&&Signals.finite(v)&&v>0&&v<100)points.put(t/(2*Signals.HOUR),new double[]{t,v});
   }
   points.put(time/(2*Signals.HOUR),new double[]{time,value});
   JSONArray history=new JSONArray();List<double[]> list=new ArrayList<>();
