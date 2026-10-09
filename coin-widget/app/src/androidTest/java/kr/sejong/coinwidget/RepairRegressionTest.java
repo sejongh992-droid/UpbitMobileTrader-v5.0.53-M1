@@ -12,7 +12,7 @@ import static org.junit.Assert.*;
 @RunWith(AndroidJUnit4.class)
 public class RepairRegressionTest {
  final Instrumentation ins=InstrumentationRegistry.getInstrumentation();final Context c=ins.getTargetContext();
- JSONObject seed()throws Exception{JSONObject r=new UpgradeTest().fixture(),m=r.getJSONObject("market");m.put("schema",5).put("pre_watchlist",m.getJSONArray("next_candidates")).put("long_watchlist",m.getJSONArray("long_candidates"));return r;}
+ JSONObject seed()throws Exception{JSONObject r=new UpgradeTest().fixture(),m=r.getJSONObject("market");m.put("schema",6).put("pre_watchlist",m.getJSONArray("next_candidates")).put("long_watchlist",m.getJSONArray("long_candidates"));return r;}
  void store(JSONObject root){c.getSharedPreferences("cache",0).edit().putString("snapshot",root.toString()).commit();c.getSharedPreferences("widget_ui",0).edit().clear().commit();}
  @Test public void tenMinuteGapKeepsRowsButRemovesBuyPermission()throws Exception{
   JSONObject r=seed(),m=r.getJSONObject("market");long now=System.currentTimeMillis();m.put("quote_at",now-600000);store(r);
@@ -34,7 +34,7 @@ public class RepairRegressionTest {
  @Test public void repeatedFxDateStillRecordsNewCheck()throws Exception{
   long now=System.currentTimeMillis();String date=java.time.Instant.ofEpochMilli(now).atZone(java.time.ZoneOffset.UTC).toLocalDate().minusDays(1).toString();JSONObject raw=new JSONObject().put("rate",1343.46).put("date",date).put("base","USD").put("quote","KRW");
   JSONObject first=FxData.parse(raw,now-3600000),second=FxData.parse(raw,now),root=new JSONObject().put("fx",second);
-  assertEquals(first.getString("date"),second.getString("date"));assertTrue(second.getLong("fetched_at")>first.getLong("fetched_at"));assertEquals("조회 정상",FxData.state(root,now));assertTrue(FxData.header(root,now).contains("확인 "+Charts.date(now,"HH:mm")));assertTrue(FxData.explanation(root,now).contains("새 발표 전"));
+  assertEquals(first.getString("date"),second.getString("date"));assertTrue(second.getLong("fetched_at")>first.getLong("fetched_at"));assertEquals("조회 정상",FxData.state(root,now));assertTrue(FxData.header(root,now).contains("확인 "+Charts.date(now,"MM/dd HH:mm")));assertTrue(FxData.explanation(root,now).contains("새 발표 전"));
   root.put("fx_failed",true);assertEquals("조회 실패 · 이전 값",FxData.state(root,now));
   try{FxData.parse(raw.put("rate",0),now);fail("Invalid rate accepted");}catch(java.io.IOException expected){}
  }

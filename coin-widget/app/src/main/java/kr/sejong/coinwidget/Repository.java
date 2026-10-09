@@ -9,22 +9,38 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /** Cached read-only snapshots. No account, trading, or withdrawal endpoints. */
 final class Repository {
  static final AtomicBoolean RUNNING=new AtomicBoolean(false);
+ static volatile String phase="";
+ interface Sources {
+  JSONObject fx()throws Exception;
+  JSONObject market()throws Exception;
+  JSONObject dominance(JSONObject previous)throws Exception;
+ }
  static JSONObject load(Context c){try{return new JSONObject(c.getSharedPreferences("cache",0).getString("snapshot","{}"));}catch(Exception e){return new JSONObject();}}
  static boolean refresh(Context context)throws Exception{
+  Context c=context.getApplicationContext();
+  return refresh(c,new Sources(){
+   public JSONObject fx()throws Exception{return FxData.parse(new JSONObject(new Net(15_000).get("https://api.frankfurter.dev/v2/providers/ecb/rate/usd/krw")),System.currentTimeMillis());}
+   public JSONObject market()throws Exception{return MarketData.fetch(new Net(105_000));}
+   public JSONObject dominance(JSONObject old)throws Exception{return DominanceData.fetch(c,new Net(20_000),old);}
+  });
+ }
+ static void save(Context c,JSONObject root)throws IOException{
+  cancelCheck();if(!c.getSharedPreferences("cache",0).edit().putString("snapshot",root.toString()).commit())throw new IOException("조회 결과 저장 실패");MarketWidget.renderAll(c);
+ }
+ static boolean refresh(Context context,Sources sources)throws Exception{
   Context c=context.getApplicationContext();if(!RUNNING.compareAndSet(false,true))return false;
   try{
-   MarketWidget.renderAll(c);Net net=new Net();JSONObject root=load(c);JSONArray errors=new JSONArray();root.put("last_attempt",System.currentTimeMillis());
-   try{root.put("market",MarketData.fetch(net));root.put("market_failed",false);}catch(Exception e){cancelCheck();root.put("market_failed",true);errors.put("업비트: "+safe(e));}
-   try{root.put("dominance",DominanceData.fetch(c,net,root.optJSONObject("dominance")));root.put("dom_failed",false);}catch(Exception e){cancelCheck();root.put("dom_failed",true);errors.put("도미넌스: "+safe(e));}
-   try{
-    JSONObject raw=new JSONObject(net.get("https://api.frankfurter.dev/v2/providers/ecb/rate/usd/krw"));
-    root.put("fx",FxData.parse(raw,System.currentTimeMillis())).put("fx_failed",false);
-   }catch(Exception e){cancelCheck();root.put("fx_failed",true);errors.put("환율: "+safe(e));}
-   cancelCheck();root.put("errors",errors).put("last_finished",System.currentTimeMillis());
-   if(!c.getSharedPreferences("cache",0).edit().putString("snapshot",root.toString()).commit())throw new IOException("조회 결과 저장 실패");
+   JSONObject root=load(c);JSONArray errors=new JSONArray();root.put("last_attempt",System.currentTimeMillis()).put("errors",errors);
+   phase="환율 확인 중";save(c,root);
+   try{root.put("fx",sources.fx()).put("fx_failed",false);}catch(Exception e){cancelCheck();root.put("fx_failed",true);errors.put("환율: "+safe(e));}
+   phase="종목 분석 중";save(c,root);
+   try{root.put("market",SnapshotState.merge(Renderer.obj(root,"market"),sources.market())).put("market_failed",false);}catch(Exception e){cancelCheck();root.put("market_failed",true);errors.put("업비트: "+safe(e));}
+   phase="비중 확인 중";save(c,root);
+   try{root.put("dominance",sources.dominance(root.optJSONObject("dominance"))).put("dom_failed",false);}catch(Exception e){cancelCheck();root.put("dom_failed",true);errors.put("도미넌스: "+safe(e));}
+   cancelCheck();root.put("last_finished",System.currentTimeMillis());save(c,root);
    JSONObject market=Renderer.obj(root,"market");Scheduler.expire(c,market.optLong("quote_at"),market.optLong("recheck_at",Long.MAX_VALUE));
    return !root.optBoolean("market_failed",true);
-  }finally{RUNNING.set(false);MarketWidget.renderAll(c);}
+  }finally{phase="";RUNNING.set(false);MarketWidget.renderAll(c);}
  }
  static void recordFailure(Context c,String message){try{JSONObject r=load(c);r.put("errors",new JSONArray().put(message)).put("last_attempt",System.currentTimeMillis()).put("market_failed",true);c.getSharedPreferences("cache",0).edit().putString("snapshot",r.toString()).apply();MarketWidget.renderAll(c);}catch(Exception ignored){}}
  private static String safe(Exception e){

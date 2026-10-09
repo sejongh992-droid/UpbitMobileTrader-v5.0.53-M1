@@ -11,8 +11,10 @@ import javax.net.ssl.HttpsURLConnection;
 final class Net {
     private static final Set<String> HOSTS=new HashSet<>(Arrays.asList(
         "api.upbit.com","api.coinpaprika.com","api.coingecko.com","api.frankfurter.dev"));
-    private final long deadline=System.nanoTime()+120_000_000_000L;
+    private final long deadline;
     private long lastUpbit;
+    Net(){this(120_000L);}
+    Net(long budgetMs){deadline=System.nanoTime()+Math.max(1,budgetMs)*1_000_000L;}
     String get(String address) throws IOException {return get(address,null);}
     String get(String address,String demoKey) throws IOException {
         check();
@@ -30,7 +32,7 @@ final class Net {
         conn.setInstanceFollowRedirects(false);conn.setRequestMethod("GET");
         conn.setRequestProperty("Accept","application/json");
         conn.setRequestProperty("Accept-Encoding","gzip");
-        conn.setRequestProperty("User-Agent","CoinMarketWidget/1.2.1 (Android; read-only)");
+        conn.setRequestProperty("User-Agent","CoinMarketWidget/1.2.2 (Android; read-only)");
         if(demoKey!=null&&!demoKey.isEmpty())conn.setRequestProperty("x-cg-demo-api-key",demoKey);
         try {
             int code=conn.getResponseCode();

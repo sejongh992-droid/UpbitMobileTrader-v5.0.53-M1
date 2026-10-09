@@ -23,7 +23,7 @@ final class FxData {
  static String header(JSONObject root,long now){
   JSONObject fx=Renderer.obj(root,"fx");if(!fx.has("rate"))return "USD 환율 조회 전\n새로고침으로 확인";
   String date=fx.optString("date");if(date.length()==10)date=date.substring(5).replace('-','/');
-  return String.format(Locale.KOREA,"USD %,.2f원",fx.optDouble("rate"))+"\n발표 "+date+" · ECB\n확인 "+Charts.date(fx.optLong("fetched_at"),"HH:mm")+" · "+state(root,now);
+  return String.format(Locale.KOREA,"USD %,.2f원",fx.optDouble("rate"))+"\n발표 "+date+" · ECB\n확인 "+Charts.date(fx.optLong("fetched_at"),"MM/dd HH:mm")+" · "+state(root,now);
  }
  static String settings(JSONObject root,long now,boolean compact){
   JSONObject fx=Renderer.obj(root,"fx");String date=fx.optString("date","—");

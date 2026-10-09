@@ -30,9 +30,9 @@ public class WidgetInteractionTest {
   seed();int id=902;Instrumentation.ActivityMonitor monitor=ins.addMonitor(MainActivity.class.getName(),null,true);
   try{
    assertTrue(Dashboard.nav(c,id,Dashboard.HELP).isBroadcast());assertFalse(Dashboard.nav(c,id,Dashboard.HELP).isActivity());
-   ins.runOnMainSync(()->{View view=Dashboard.build(c,340,760,id).apply(c,new FrameLayout(c));assertFalse(view.findViewById(R.id.panel).hasOnClickListeners());assertFalse(view.findViewById(R.id.title).hasOnClickListeners());assertTrue(view.findViewById(R.id.row_root).performClick());});
+   ins.runOnMainSync(()->{View view=Dashboard.build(c,340,760,id).apply(c,new FrameLayout(c));assertFalse(view.findViewById(R.id.panel).hasOnClickListeners());assertTrue(view.findViewById(R.id.title).hasOnClickListeners());assertTrue(view.findViewById(R.id.row_root).performClick());});
    awaitScreen(id,Dashboard.COIN);assertEquals("KRW-LPT",Dashboard.prefs(c).getString("coin"+id,""));
-   for(int action:new int[]{Dashboard.BACK,Dashboard.MARKET,Dashboard.BTC,Dashboard.DOM,Dashboard.HELP,Dashboard.SETTINGS}){Dashboard.nav(c,id,action).send();awaitScreen(id,action==Dashboard.BACK?0:action);}
+   for(int action:new int[]{Dashboard.BACK,Dashboard.MARKET,Dashboard.BTC,Dashboard.DOM,Dashboard.CHECK,Dashboard.HELP,Dashboard.SETTINGS}){Dashboard.nav(c,id,action).send();awaitScreen(id,action==Dashboard.BACK?0:action);}
    assertEquals("Widget click must never start MainActivity",0,monitor.getHits());
   }finally{ins.removeMonitor(monitor);}
  }
@@ -55,11 +55,11 @@ public class WidgetInteractionTest {
  @Test public void everyScreenFitsAndAllActionsAreLarge()throws Exception{
   seed();ins.runOnMainSync(()->{
    for(float font:new float[]{1f,1.3f}){Configuration config=new Configuration(c.getResources().getConfiguration());config.fontScale=font;Context cc=c.createConfigurationContext(config);float den=cc.getResources().getDisplayMetrics().density;
-    for(int height:new int[]{380,480,600,760})for(int action:new int[]{0,1,Dashboard.LONG,Dashboard.MARKET,Dashboard.COIN,Dashboard.HELP,Dashboard.SETTINGS,Dashboard.BTC,Dashboard.DOM}){
+    for(int height:new int[]{380,480,600,760})for(int action:new int[]{0,1,Dashboard.LONG,Dashboard.MARKET,Dashboard.COIN,Dashboard.HELP,Dashboard.CHECK,Dashboard.SETTINGS,Dashboard.BTC,Dashboard.DOM}){
      Dashboard.move(cc,905,action,"KRW-LPT");View v=Dashboard.build(cc,280,height,905).apply(cc,new FrameLayout(cc));v.measure(View.MeasureSpec.makeMeasureSpec((int)(280*den),View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec((int)(height*den),View.MeasureSpec.EXACTLY));v.layout(0,0,v.getMeasuredWidth(),v.getMeasuredHeight());
-     for(int id:new int[]{R.id.tab_today,R.id.tab_morning,R.id.tab_long,R.id.page_prev,R.id.page_label,R.id.page_next,R.id.list_home,R.id.market_home,R.id.open_app,R.id.refresh}){View b=v.findViewById(id);if(action==Dashboard.SETTINGS&&(id==R.id.page_prev||id==R.id.page_label||id==R.id.page_next))continue;assertTrue("Touch height "+id,b.getHeight()>=48*den-1);assertTrue("Touch width "+id,b.getWidth()>=48*den-1);int bottom=b.getBottom();View parent=(View)b.getParent();while(parent!=v){bottom+=parent.getTop();parent=(View)parent.getParent();}assertTrue("Footer clipped h="+height+" action="+action+" font="+font,bottom<=v.getHeight()-v.getPaddingBottom()+1);}
-     TextView detail=v.findViewById(R.id.detail_text);if(action==Dashboard.COIN||action==Dashboard.HELP||action==Dashboard.SETTINGS){assertNotNull(detail.getLayout());assertTrue("Detail text clipped h="+height+" action="+action+" font="+font+" actualText="+detail.getLayout().getHeight()+" available="+detail.getHeight()+" text="+detail.getText(),detail.getLayout().getHeight()<=detail.getHeight()+1);}
-     if(font==1f&&(height==380||height==760))save(v,"synthetic-v121-"+height+"-"+action+".png");
+     for(int id:new int[]{R.id.title,R.id.tab_today,R.id.tab_morning,R.id.tab_long,R.id.page_prev,R.id.page_label,R.id.page_next,R.id.list_home,R.id.market_home,R.id.open_app,R.id.refresh}){View b=v.findViewById(id);if(action==Dashboard.SETTINGS&&(id==R.id.page_prev||id==R.id.page_label||id==R.id.page_next))continue;assertTrue("Touch height "+id,b.getHeight()>=48*den-1);assertTrue("Touch width "+id,b.getWidth()>=48*den-1);int bottom=b.getBottom();View parent=(View)b.getParent();while(parent!=v){bottom+=parent.getTop();parent=(View)parent.getParent();}assertTrue("Footer clipped h="+height+" action="+action+" font="+font,bottom<=v.getHeight()-v.getPaddingBottom()+1);}
+     TextView detail=v.findViewById(R.id.detail_text);if(action==Dashboard.COIN||action==Dashboard.HELP||action==Dashboard.CHECK||action==Dashboard.SETTINGS){assertNotNull(detail.getLayout());assertTrue("Detail text clipped h="+height+" action="+action+" font="+font+" actualText="+detail.getLayout().getHeight()+" available="+detail.getHeight()+" text="+detail.getText(),detail.getLayout().getHeight()<=detail.getHeight()+1);}
+     if(font==1f&&(height==380||height==760))save(v,"synthetic-v122-"+height+"-"+action+".png");
     }
    }
   });

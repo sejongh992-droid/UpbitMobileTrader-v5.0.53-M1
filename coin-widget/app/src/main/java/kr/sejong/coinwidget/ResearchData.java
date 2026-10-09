@@ -7,7 +7,7 @@ final class ResearchData {
   for(Signals.Quote q:quotes){if(Signals.isAlt(q.market)&&q.time>0&&now-q.time<=600000&&q.time<=now+60000){count++;if(q.dayPct>0)up++;}if(Research.pool(q,now))pool.add(q);}
   double breadth=count>0?up*100.0/count:Double.NaN;String regime=Signals.btcRegime(btc.price,daily,now);
   List<JSONObject>all=new ArrayList<>();List<Signals.Bar>bh=new ArrayList<>();int inspected=0,failed=0,invalid=0;
-  String error="",defenseReason="BTC 시간봉 확인 필요";boolean defensive=true;
+  String error="",defenseReason="BTC 시간봉 확인 필요";boolean defensive=true,hourlyError=false;
   pool.sort((a,b)->Double.compare(Signals.screeningScore(b,btc.dayPct),Signals.screeningScore(a,btc.dayPct)));
   try{bh=Repository.readBars(new JSONArray(net.get("https://api.upbit.com/v1/candles/minutes/60?market=KRW-BTC&count=80")));
    List<Signals.Bar>closed=Signals.closed(bh,now,Signals.HOUR);double b1=Signals.returnHours(closed,1);
@@ -21,7 +21,7 @@ final class ResearchData {
       .put("entry_low",s.entryLo).put("entry_high",s.entryHi).put("reference_rr",s.rr);all.add(o);
     }catch(Exception e){Repository.cancelCheck();failed++;if(failed>=5){error="통신 실패 누적: 일부 종목만 분석";break;}}
    }
-  }catch(Exception e){Repository.cancelCheck();error="시간봉 조회 실패: 매수 검토 보류";}
+  }catch(Exception e){Repository.cancelCheck();hourlyError=true;error="시간봉 조회 실패: 분석 보류";}
   // Keep verified observations visible even when no coin passes every buy condition.
   all.sort((a,b)->{int d=Boolean.compare(b.optBoolean("qualified"),a.optBoolean("qualified"));return d!=0?d:Double.compare(b.optDouble("morning_score"),a.optDouble("morning_score"));});
   List<JSONObject> preWatch=new ArrayList<>();int pulseChecked=0,pulseFailed=0;
@@ -61,7 +61,11 @@ final class ResearchData {
   List<Signals.Bar>d=Signals.closed(daily,now,24*Signals.HOUR);JSONObject technical=new JSONObject();
   if(d.size()>=60){double hi=0,lo=Double.MAX_VALUE;for(int i=d.size()-20;i<d.size();i++){hi=Math.max(hi,d.get(i).high);lo=Math.min(lo,d.get(i).low);}technical.put("rsi",Signals.rsi(d,14)).put("ma20",Signals.sma(d,20)).put("ma60",Signals.sma(d,60)).put("high20",hi).put("low20",lo);}
   List<Signals.Bar>closed=Signals.closed(bh,now,Signals.HOUR);double b6=Signals.returnHours(closed,6);if(Signals.finite(b6))technical.put("return6h",b6);
-  return new JSONObject().put("defensive",defensive).put("defense_reason",defenseReason).put("schema",5).put("fetched_at",System.currentTimeMillis()).put("quote_at",now).put("btc",Repository.quoteJson(btc)).put("daily",Repository.barsJson(daily)).put("btc_technical",technical).put("btc_regime",regime)
+  String dayStatus=hourlyError||all.isEmpty()&&failed>0?"error":failed+pulseFailed>0?"partial":all.isEmpty()?"insufficient":"ok";
+  String preStatus=hourlyError||preWatch.isEmpty()&&(failed+pulseFailed)>0?"error":failed+pulseFailed>0?"partial":preWatch.isEmpty()?"insufficient":"ok";
+  String longStatus=longs.isEmpty()&&longFailed>0?"error":longFailed>0?"partial":longs.isEmpty()?"insufficient":"ok";
+  return new JSONObject().put("day_status",dayStatus).put("pre_status",preStatus).put("long_status",longStatus).put("day_at",now).put("pre_at",now).put("long_at",now).put("pre_recheck_at",Research.nextNine(now))
+   .put("defensive",defensive).put("defense_reason",defenseReason).put("schema",6).put("fetched_at",System.currentTimeMillis()).put("quote_at",now).put("btc",Repository.quoteJson(btc)).put("daily",Repository.barsJson(daily)).put("btc_technical",technical).put("btc_regime",regime)
    .put("alt_total",(int)quotes.stream().filter(q->Signals.isAlt(q.market)).count()).put("quote_count",quotes.size()).put("breadth",Signals.finite(breadth)?breadth:JSONObject.NULL).put("advancing",up).put("alt_count",count).put("candidates",strict).put("watchlist",today).put("next_candidates",morning).put("pre_watchlist",morningWatch).put("pre_count",pre)
    .put("long_candidates",longList).put("long_watchlist",longWatch).put("long_inspected",longInspected).put("long_failed",longFailed).put("long_defensive",longDefense).put("pulse_checked",pulseChecked).put("pulse_failed",pulseFailed).put("screened",pool.size()).put("inspected",inspected).put("invalid",invalid).put("failed",failed).put("screening_error",error+(failed>0?" · 실패 "+failed+"개":"")).put("recheck_at",Research.nextNine(now));
  }

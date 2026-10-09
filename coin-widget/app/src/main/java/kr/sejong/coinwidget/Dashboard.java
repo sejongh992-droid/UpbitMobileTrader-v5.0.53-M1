@@ -12,7 +12,7 @@ import java.util.*;
 final class Dashboard {
  static final int INK=0xff1c2940,PURPLE=0xff6550cc,MUTED=0xff738096;
  static final String NAV="kr.sejong.coinwidget.NAV";
- static final int MARKET=4,HELP=5,SETTINGS=6,BACK=7,AUTO=8,BTC=9,DOM=10,LONG=11,COIN=20;
+ static final int MARKET=4,HELP=5,SETTINGS=6,BACK=7,AUTO=8,BTC=9,DOM=10,LONG=11,CHECK=12,COIN=20;
  static String f(double v){return Signals.finite(v)?String.format(Locale.KOREA,"%.1f",v):"—";}
  static SharedPreferences prefs(Context c){return c.getSharedPreferences("widget_ui",0);}
  static int mode(Context c,int id){return prefs(c).getInt("mode"+id,0);}
@@ -24,7 +24,7 @@ final class Dashboard {
   else if(action==2||action==3){String key=(screen(c,id)==0?"page":"detailPage")+id;int count=Math.max(1,p.getInt("pages"+id,1));int target=(p.getInt(key,0)+(action==2?count-1:1))%count;if(market.matches("page:[0-9]{1,4}"))target=Integer.parseInt(market.substring(5));e.putInt(key,target);}
   else if(action==BACK)e.putInt("screen"+id,0);
   else if(action==AUTO){boolean auto=c.getSharedPreferences("settings",0).getBoolean("auto",true);c.getSharedPreferences("settings",0).edit().putBoolean("auto",!auto).apply();Scheduler.ensure(c);}
-  else if(action==HELP||action==SETTINGS||action==BTC||action==DOM||action==MARKET)e.putInt("screen"+id,action).putInt("detailPage"+id,0);
+  else if(action==HELP||action==SETTINGS||action==BTC||action==DOM||action==MARKET||action==CHECK)e.putInt("screen"+id,action).putInt("detailPage"+id,0);
   else if(action==COIN&&market.matches("KRW-[A-Z0-9]+"))e.putInt("screen"+id,COIN).putString("coin"+id,market).putInt("detailPage"+id,0);
   e.apply();
  }
@@ -34,25 +34,25 @@ final class Dashboard {
   return PendingIntent.getBroadcast(c,100+action,i,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
  }
  static boolean freshRecommendation(JSONObject root,int mode,long now){
-  JSONObject m=Renderer.obj(root,"market");long age=now-m.optLong("quote_at");
-  return Renderer.freshMarket(root)&&m.optInt("schema")>=4&&age>=-60000&&age<=5*60_000L&&(mode!=1||now<m.optLong("recheck_at"));
+  JSONObject m=Renderer.obj(root,"market");long age=now-SnapshotState.time(m,mode);
+  return Renderer.freshMarket(root)&&m.optInt("schema")>=6&&!SnapshotState.failed(m,mode)&&age>=-60000&&age<=5*60_000L&&(mode!=1||now<SnapshotState.nine(m));
  }
  static JSONArray list(JSONObject m,int mode){
   String key=mode==1?"pre_watchlist":mode==2?"long_watchlist":"watchlist";
   JSONArray source=Renderer.arr(m,m.has(key)?key:mode==1?"next_candidates":mode==2?"long_candidates":"candidates"),result=new JSONArray();
   for(int i=0;i<source.length();i++){JSONObject a=source.optJSONObject(i),q=Renderer.obj(a,"quote");double price=q.optDouble("price");if(a!=null&&q.optString("market").matches("KRW-[A-Z0-9]+")&&Signals.finite(price)&&price>0)result.put(a);}return result;
  }
- static boolean qualified(JSONObject m,JSONObject a,int mode){return !m.optBoolean(mode==2?"long_defensive":"defensive",true)&&a.optBoolean(mode==1?"pre_qualified":"qualified");}
+ static boolean qualified(JSONObject m,JSONObject a,int mode){return !SnapshotState.failed(m,mode)&&!m.optBoolean(mode==2?"long_defensive":"defensive",true)&&a.optBoolean(mode==1?"pre_qualified":"qualified");}
  static String label(JSONObject root,JSONObject a,int mode,long now){
   JSONObject m=Renderer.obj(root,"market");
-  if(mode==1&&m.optLong("recheck_at")>0&&now>=m.optLong("recheck_at"))return "09시 마감 · 이전 분석";
+  if(mode==1&&SnapshotState.nine(m)>0&&now>=SnapshotState.nine(m))return "09시 마감 · 이전 분석";
   if(!freshRecommendation(root,mode,now))return "이전 분석 · 재확인";
-  if(qualified(m,a,mode))return mode==1&&!BeforeNine.entryWindow(now)?"예비 충족 · 08시 재확인":"매수 조건 충족";
+  if(qualified(m,a,mode))return mode==1&&!BeforeNine.entryWindow(now)?"예비 충족 · 08시 재확인":"차트 조건 충족";
   return "관찰 · 조건 부족";
  }
  static void visible(RemoteViews v,int id,boolean show){v.setViewVisibility(id,show?View.VISIBLE:View.GONE);}
  static String summary(JSONObject m){return m.optBoolean("defensive",true)?"시장 주의 · "+m.optString("defense_reason","시장 자료 확인 필요"):"BTC "+m.optString("btc_regime","판단 보류")+" · 알트 상승 "+f(m.optDouble("breadth",Double.NaN))+"%";}
- static int bodyHeight(int height){return Math.max(60,height-264);}
+ static int bodyHeight(int height){return Math.max(60,height-270);}
  static int rows(Context c,int height){int body=bodyHeight(height);int banner=body>=250?56:0;float font=Math.max(1f,c.getResources().getConfiguration().fontScale);return Math.max(1,Math.min(8,(int)((body-banner-24)/(76*font))));}
  static RemoteViews build(Context c,int height,int id){return build(c,340,height,id);}
  static RemoteViews build(Context c,int width,int height,int id){
@@ -60,6 +60,7 @@ final class Dashboard {
   RemoteViews v=new RemoteViews(c.getPackageName(),R.layout.widget_v120);
   v.setTextViewTextSize(R.id.detail_text,TypedValue.COMPLEX_UNIT_SP,screen==SETTINGS?14:15);
   v.setTextViewText(R.id.fx,FxData.header(root,now));
+  v.setTextViewText(R.id.title,"검증·설명");v.setOnClickPendingIntent(R.id.title,nav(c,id,CHECK));
   int[]tabs={R.id.tab_today,R.id.tab_morning,R.id.tab_long};int[]actions={0,1,LONG};
   for(int j=0;j<tabs.length;j++){v.setTextColor(tabs[j],mode==j?PURPLE:MUTED);v.setInt(tabs[j],"setBackgroundResource",mode==j?R.drawable.tab_selected:R.drawable.tab_idle);v.setOnClickPendingIntent(tabs[j],nav(c,id,actions[j]));}
   visible(v,R.id.market_panel,screen==MARKET);visible(v,R.id.recommendations,screen==0);visible(v,R.id.detail_panel,screen!=0&&screen!=MARKET);
@@ -72,8 +73,8 @@ final class Dashboard {
    v.setTextViewText(R.id.today,(mode==0?"금일":mode==2?"1~3개월":phase)+(fresh?" · 조건 충족 ":" · 이전 충족 ")+qualifiedCount+" / 분석 "+items.length()+"개");v.removeAllViews(R.id.coin_rows);
    if(items.length()==0){RemoteViews empty=new RemoteViews(c.getPackageName(),R.layout.coin_empty);String msg;
     if(Repository.RUNNING.get())msg="최신 시세 분석 중\n잠시 후 이 화면에 표시됩니다.";
-    else if(m.optInt("schema")<5)msg="새로고침을 한 번 눌러 주세요.\n새 분석 목록을 준비합니다.";
-    else msg="분석 가능한 자료가 부족합니다.\n"+m.optString("screening_error","")+"\n새로고침으로 다시 확인하세요.";
+    else if(m.optInt("schema")<6)msg="새로고침을 한 번 눌러 주세요.\n새 분석 목록을 준비합니다.";
+    else msg=SnapshotState.state(m,mode)+"\n"+(SnapshotState.failed(m,mode)?"통신 실패로 분석하지 못했습니다.":"연속된 완료 봉을 확보하지 못했습니다.")+"\n새로고침으로 다시 확인하세요.";
     empty.setTextViewText(R.id.empty_label,msg);v.addView(R.id.coin_rows,empty);
    }
    for(int j=page*count;j<Math.min(items.length(),(page+1)*count);j++){
@@ -85,7 +86,7 @@ final class Dashboard {
     row.setTextViewText(R.id.row_status,label(root,a,mode,now)+" · "+metric);
     row.setOnClickPendingIntent(R.id.row_root,nav(c,id,COIN,code));v.addView(R.id.coin_rows,row);
    }
-   v.setTextViewText(R.id.page_label,(page+1)+" / "+pages+"\n"+(mode==1?Charts.date(m.optLong("recheck_at"),"MM/dd")+" 09시":"종목 눌러 분석"));
+   v.setTextViewText(R.id.page_label,(page+1)+" / "+pages+"\n"+(mode==1?Charts.date(SnapshotState.nine(m),"MM/dd")+" 09시":"종목 눌러 분석"));
   }else if(screen==MARKET){
    v.setTextViewText(R.id.btc_price,btc.has("price")?Charts.number(btc.optDouble("price"))+"원":"— 원");
    v.setTextViewText(R.id.btc_state,m.optString("btc_regime","조회 전"));
@@ -110,8 +111,8 @@ final class Dashboard {
   prefs(c).edit().putInt("pages"+id,pages).apply();
   v.setOnClickPendingIntent(R.id.page_prev,nav(c,id,2,"page:"+((page+pages-1)%pages)));v.setOnClickPendingIntent(R.id.page_next,nav(c,id,3,"page:"+((page+1)%pages)));
   v.setViewVisibility(R.id.page_prev,pages>1?View.VISIBLE:View.INVISIBLE);v.setViewVisibility(R.id.page_next,pages>1?View.VISIBLE:View.INVISIBLE);
-  String status=Repository.RUNNING.get()?"조회 중…":root.optBoolean("market_failed")?"조회 실패 · 이전 자료":fresh?"최근 분석":mode==1&&now>=m.optLong("recheck_at",Long.MAX_VALUE)?"09시 마감 · 재조회":"이전 분석 · 재확인";
-  v.setTextViewText(R.id.updated,"시세 "+Charts.date(m.optLong("quote_at"),"MM/dd HH:mm")+" KST · "+status+"\n"+(c.getSharedPreferences("settings",0).getBoolean("auto",true)?"15분 자동 · 절전 시 지연":"수동 조회")+" · 매수 전 새로고침");
+  String status=Repository.RUNNING.get()?Repository.phase:root.optBoolean("market_failed")?"조회 실패 · 이전 자료":SnapshotState.failed(m,mode)?SnapshotState.state(m,mode):fresh?SnapshotState.state(m,mode):mode==1&&now>=SnapshotState.nine(m)?"09시 마감 · 재조회":"이전 분석 · 재확인";
+  v.setTextViewText(R.id.updated,"분석 "+Charts.date(SnapshotState.time(m,mode),"MM/dd HH:mm")+" KST · "+status+"\n"+(c.getSharedPreferences("settings",0).getBoolean("auto",true)?"15분 자동 · 절전 시 지연":"수동 조회")+" · 매수 전 새로고침");
   v.setOnClickPendingIntent(R.id.list_home,nav(c,id,BACK));v.setOnClickPendingIntent(R.id.market_home,nav(c,id,MARKET));v.setTextViewText(R.id.market_home,"시장");
   v.setTextViewText(R.id.open_app,"설정");v.setOnClickPendingIntent(R.id.open_app,nav(c,id,SETTINGS));
   v.setTextViewText(R.id.refresh,Repository.RUNNING.get()?"조회 중…":"새로고침");v.setOnClickPendingIntent(R.id.refresh,PendingIntent.getForegroundService(c,12,new Intent(c,RefreshService.class).setAction("kr.sejong.coinwidget.REFRESH"),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE));

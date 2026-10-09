@@ -9,7 +9,7 @@ public final class MarketWidget extends AppWidgetProvider {
  @Override public void onReceive(Context c,Intent i){
   if(i!=null&&Dashboard.NAV.equals(i.getAction())){
    int id=i.getIntExtra("widget",0),a=i.getIntExtra("nav",-1);
-   if((a>=0&&a<=11)||a==Dashboard.COIN){Dashboard.move(c,id,a,i.getStringExtra("market")==null?"":i.getStringExtra("market"));renderAll(c);}return;
+   if((a>=0&&a<=12)||a==Dashboard.COIN){Dashboard.move(c,id,a,i.getStringExtra("market")==null?"":i.getStringExtra("market"));renderAll(c);}return;
   }
   super.onReceive(c,i);
  }
