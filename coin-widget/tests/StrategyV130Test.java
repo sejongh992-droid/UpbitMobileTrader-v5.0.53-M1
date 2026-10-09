@@ -19,6 +19,9 @@ public final class StrategyV130Test {
   List<Signals.Bar>gap=new ArrayList<>(h);gap.remove(gap.size()-8);ok(StrategyV130.shortRule(1,q,gap,b,f,NOW)==null,"hour gap rejects");gap=new ArrayList<>(f);gap.remove(gap.size()-8);ok(StrategyV130.shortRule(1,q,h,b,gap,NOW)==null,"five-minute gap rejects");ok(StrategyV130.shortRule(1,q,h,b,f,NOW+300000)==null,"stale quote/pulse rejects");
   List<Signals.Bar>d=days(false),bd=days(true);StrategyV130.Result lon=StrategyV130.longRule(quote(d.get(149).close,NOW),d,bd,NOW);ok(lon!=null,"long enough daily history");ok(Math.abs(lon.ret90-(d.get(149).close/d.get(59).close-1)*100)<1e-10,"90 day return uses past completed close");ok(StrategyV130.longRule(q,d.subList(30,150),bd,NOW)==null,"125 daily bars required");
   List<Signals.Bar>risingBtc=new ArrayList<>();for(int i=0;i<150;i++)risingBtc.add(new Signals.Bar(NOW-(150-i)*24*Signals.HOUR,100+i*2,101+i*2,99+i*2,100+i*2,100));StrategyV130.Result weak=StrategyV130.longRule(quote(d.get(149).close,NOW),d,risingBtc,NOW);ok(weak!=null&&weak.rel90<0&&!weak.pass&&weak.risk.contains("30·90일"),"relative 90 day underperformance blocks long entry");
+  List<Signals.Bar>positive=new ArrayList<>();for(int i=0;i<150;i++){double v=100+i*.3+4*Math.sin(i*.4);positive.add(new Signals.Bar(NOW-(150-i)*24*Signals.HOUR,v-.1,v+(i==110?35:1.8),v-1.8,v,i>=143?200:100));}
+  Signals.Quote positiveQuote=quote(positive.get(149).close,NOW);StrategyV130.Result positiveLong=StrategyV130.longRule(positiveQuote,positive,bd,NOW);ok(positiveLong!=null&&positiveLong.pass,"long candidate can admit balanced rising structure");
+  List<Signals.Bar>dailyGap=new ArrayList<>(positive);dailyGap.remove(80);ok(StrategyV130.longRule(positiveQuote,dailyGap,bd,NOW)==null,"daily gap blocks long analysis");
   System.out.println("PASS StrategyV130Test: "+tests+" assertions (independent modes, real-price cost, no future candles, freshness, gaps, 90-day strength)");
  }
 }

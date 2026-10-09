@@ -5,7 +5,7 @@ import org.json.*;
 import java.util.*;
 final class DetailContent {
  static final class Result {String title,price="",text;Bitmap chart;Result(String title,String text){this.title=title;this.text=text;}}
- static final String GUIDE="① 위쪽에서 금일·09시 전·중장기 선택\n② 종목을 누르면 이유와 부족한 조건 확인\n③ 아래 목록으로 돌아오기\n\n매수 전에는 새로고침을 누르세요. 관찰은 차트 조건 미충족이며, 차트를 통과해도 수익 검증 상태는 별도로 봅니다. 금일·중장기는 5분, 9시 전은 2분 뒤에도 목록은 유지되며 ‘이전 분석’으로 바뀝니다.\n\n09시 전은 선매수 후 09시 이후 상승 시 매도 검토 목적입니다. 08:30~08:55 외에는 예비 목록이며 9시가 지나면 재조회해야 합니다.\n\n중장기는 1~3개월의 기술적 추세 분석입니다. 뉴스·사업가치·토큰 발행은 포함하지 않습니다.\n\n83점은 83% 상승 확률이 아닙니다. 조건점수는 정렬용이며 상승·수익을 보장하지 않습니다.\n\n앱은 홈 화면 앱 아이콘으로만 엽니다.";
+ static final String GUIDE="① 위쪽에서 금일·09시 전·중장기 선택\n② 종목을 누르면 이유와 부족한 조건 확인\n③ 아래 목록으로 돌아오기\n\n매수 전에는 새로고침을 누르세요. 관찰은 차트 조건 미충족이며, 차트를 통과해도 수익 검증 상태는 별도로 봅니다. 금일·중장기는 5분, 9시 전은 2분 뒤에도 목록은 유지되며 ‘이전 분석’으로 바뀝니다.\n\n09시 전은 선매수 후 09시 이후 상승 시 매도 검토 목적입니다. 08:30~08:55 외에는 예비 목록이며 9시가 지나면 재조회해야 합니다.\n\n중장기는 1~3개월의 기술적 추세 분석입니다. 뉴스·사업가치·토큰 발행은 포함하지 않습니다.\n\n용어: 상대강도는 같은 기간 BTC보다 얼마나 강하게 움직였는지입니다. 거래대금 배수는 이전 평균과의 비교입니다. 지지는 과거 하락을 버틴 가격, 저항은 과거 상승이 막힌 가격을 참고한 값입니다.\n\n83점은 83% 상승 확률이 아닙니다. 조건점수는 정렬용이며 상승·수익을 보장하지 않습니다.\n\n앱은 홈 화면 앱 아이콘으로만 엽니다.";
  static String lack(JSONObject m,JSONObject a,int mode){
   if(m.optInt("schema")>=7)return a.optString("risk","완료 봉·가격 조건 확인 필요");
   if(m.optBoolean(mode==2?"long_defensive":"defensive",true))return mode==2?"BTC 일봉 약세·자료 확인 필요":m.optString("defense_reason","시장 약세");

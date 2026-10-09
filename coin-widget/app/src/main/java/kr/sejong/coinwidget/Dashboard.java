@@ -76,7 +76,7 @@ final class Dashboard {
    if(items.length()==0){RemoteViews empty=new RemoteViews(c.getPackageName(),R.layout.coin_empty);String msg;
     if(Repository.RUNNING.get())msg="최신 시세 분석 중\n잠시 후 이 화면에 표시됩니다.";
     else if(m.optInt("schema")<7)msg="새로고침을 한 번 눌러 주세요.\n새 분석 목록을 준비합니다.";
-    else msg=SnapshotState.state(m,mode)+"\n"+(SnapshotState.failed(m,mode)?"통신 실패로 분석하지 못했습니다.":"연속된 완료 봉을 확보하지 못했습니다.")+"\n새로고침으로 다시 확인하세요.";
+    else msg=SnapshotState.state(m,mode)+"\n"+(SnapshotState.failed(m,mode)?"통신 실패로 분석하지 못했습니다.":"거래대금·최신 시세·연속 봉 조건을 만족하는 분석 자료가 없습니다.")+"\n새로고침으로 다시 확인하세요.";
     empty.setTextViewText(R.id.empty_label,msg);v.addView(R.id.coin_rows,empty);
    }
    for(int j=page*count;j<Math.min(items.length(),(page+1)*count);j++){
