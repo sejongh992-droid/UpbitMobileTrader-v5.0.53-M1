@@ -1,0 +1,53 @@
+{
+  "version": "v130-first-fixed-candidates",
+  "created_at": "2026-10-09T02:50:35.255257+00:00",
+  "goal": "Compare original v1.2.2 and one predetermined candidate for each of day/pre09/long. Do not tune thresholds to evaluation results. If results fail, keep observations but disable validated-buy status.",
+  "short_period": "2026-08-25 through 2026-10-07",
+  "short_development": "2026-08-25 through 2026-09-14",
+  "short_embargo": "2026-09-15 through 2026-09-17",
+  "short_evaluation": "2026-09-18 through 2026-10-07",
+  "short_decisions_kst": {
+    "day": [
+      "10:00",
+      "14:00",
+      "18:00",
+      "22:00"
+    ],
+    "pre09": [
+      "08:50"
+    ]
+  },
+  "entry": "First scheduled 5-minute candle open at decision+5min; never same candle high/low or hypothetical cheaper limit price.",
+  "exits": {
+    "day": [
+      "1h",
+      "2h primary",
+      "4h"
+    ],
+    "pre09": [
+      "09:05",
+      "09:15 primary",
+      "09:30"
+    ],
+    "long": [
+      "30d",
+      "60d",
+      "90d primary"
+    ]
+  },
+  "long_development": "2025-01-01 through 2025-04-30",
+  "long_embargo": "2025-05-01 through 2025-07-31",
+  "long_evaluation": "2025-08-01 through 2026-01-31",
+  "long_decision": "09:00 KST, next day open entry to allow response/decision latency",
+  "fees_each_side": 0.0005,
+  "slippage_each_side_base": 0.0005,
+  "slippage_each_side_stress": 0.001,
+  "universe": "Diagnostic KRW universe and available candles. Short uses recorded lifecycle/warnings and top30 trailing-hour liquidity; long uses retrievable historical candle existence. Pre-08:50 pool liquidity approximated from completed hourly candles. Not complete historical orderbook or full tick replay.",
+  "selection": "Compare strict pass top5, observation top5, and liquid-universe equal-weight/BTC/cash. No outcome-based top5 substitutions. Equal timestamp weighting and equal day weighting reported.",
+  "candidate_day": "Positive completed-hour trend and BTC relative momentum; completed5m 15min acceleration; ATR-normalized relative strength rank; avoid overextension; current observed close and costs for support/resistance room.",
+  "candidate_pre09": "Independent 5m squeeze/volume acceleration and close-position rule with hourly relative strength; entry only08:30-08:55, validity2min and noentryafter08:58. Not a subset of day buy qualification.",
+  "candidate_long": "Positive20/60/120day trend and BTC regime; positive30/90day relative momentum; volatility-normalized momentum rank; require positive cost-adjusted resistance room at observed price.",
+  "validation_gate": "Requires >=30 evaluation observations across >=10 short signal days or >=90 long signal days; base and stress net positive; paired advantage over liquid benchmark positive; day/block-bootstrap lower95% mean net >0. Long block=90days; short cluster=day. Must disclose universe/quote approximations; never claim prospective or real-account validation.",
+  "previously_seen": "Earlier reports already examined some 2026 outcomes. These are retrospective date-separated evaluations, not a pristine prospective holdout.",
+  "no_posthoc_tuning": true
+}
