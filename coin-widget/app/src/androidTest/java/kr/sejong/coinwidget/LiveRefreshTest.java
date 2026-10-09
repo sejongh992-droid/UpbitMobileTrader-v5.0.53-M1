@@ -18,7 +18,9 @@ public class LiveRefreshTest {
  @Test public void manualRefreshCompletesWithRealPublicData()throws Exception{
   Instrumentation ins=InstrumentationRegistry.getInstrumentation();Context c=ins.getTargetContext();Scheduler.cancel(c);Repository.RUNNING.set(false);
   c.getSharedPreferences("settings",0).edit().putBoolean("auto",false).putString("dominance_source","CoinPaprika").commit();SecureStore.clear(c);
-  JSONObject seed=new JSONObject().put("market",new JSONObject().put("schema",4).put("fetched_at",System.currentTimeMillis()));
+  // Start from a fresh schema so onResume does not race the manual action.
+  // In v1.2.2 FX is saved first; an automatic request could finish FX before start.
+  JSONObject seed=new JSONObject().put("market",new JSONObject().put("schema",6).put("quote_at",System.currentTimeMillis()).put("fetched_at",System.currentTimeMillis()));
   c.getSharedPreferences("cache",0).edit().putString("snapshot",seed.toString()).commit();
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    long start=System.currentTimeMillis();scenario.onActivity(a->{assertNotNull(a.findViewById(R.id.refresh));a.findViewById(R.id.refresh).performClick();a.refresh();a.refresh();});

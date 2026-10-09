@@ -27,7 +27,7 @@ final class FxData {
  }
  static String settings(JSONObject root,long now,boolean compact){
   JSONObject fx=Renderer.obj(root,"fx");String date=fx.optString("date","—");
-  if(compact)return "자동 15분 · 절전 시 지연\n발표 "+(date.length()==10?date.substring(5).replace('-','/'):date)+" · ECB 일일값\n확인 "+Charts.date(fx.optLong("fetched_at"),"MM/dd HH:mm");
+  if(compact)return "발표 "+(date.length()==10?date.substring(5).replace('-','/'):date)+" · ECB 일일값\n확인 "+Charts.date(fx.optLong("fetched_at"),"MM/dd HH:mm");
   return "자동 15분 · 08:30/08:50 추가\n절전·통신 상태에 따라 지연\n환율 "+state(root,now)+"\n발표 "+date+"\n확인 "+Charts.date(fx.optLong("fetched_at"),"MM/dd HH:mm:ss")+" KST\nECB 일일값 · 새 발표 전 유지\n위쪽 분류 → 종목 → 아래 목록\n매수 전 새로고침";
  }
  static String explanation(JSONObject root,long now){JSONObject f=Renderer.obj(root,"fx");return "환율 "+state(root,now)+"\n발표 기준일 "+f.optString("date","—")+"\n조회 "+Charts.date(f.optLong("fetched_at"),"MM/dd HH:mm:ss")+" KST\nECB 일일 기준환율입니다. 새로 조회해도 새 발표 전에는 날짜·값이 같습니다. 실시간 환전가는 아닙니다.";}
