@@ -32,7 +32,7 @@ final class Net {
         conn.setInstanceFollowRedirects(false);conn.setRequestMethod("GET");
         conn.setRequestProperty("Accept","application/json");
         conn.setRequestProperty("Accept-Encoding","gzip");
-        conn.setRequestProperty("User-Agent","CoinMarketWidget/1.2.2 (Android; read-only)");
+        conn.setRequestProperty("User-Agent","CoinMarketWidget/1.3.0 (Android; read-only)");
         if(demoKey!=null&&!demoKey.isEmpty())conn.setRequestProperty("x-cg-demo-api-key",demoKey);
         try {
             int code=conn.getResponseCode();

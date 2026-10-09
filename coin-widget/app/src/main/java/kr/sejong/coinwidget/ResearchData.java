@@ -2,71 +2,58 @@ package kr.sejong.coinwidget;
 import org.json.*;
 import java.util.*;
 final class ResearchData {
+ static JSONObject record(Signals.Quote q,StrategyV130.Result s,int mode)throws JSONException{
+  boolean approved=s.pass&&ValidationPolicy.approved(mode);
+  return new JSONObject().put("quote",Repository.quoteJson(q)).put("rule_pass",s.pass).put("pre_rule_pass",mode==1&&s.pass).put("qualified",mode!=1&&approved).put("pre_qualified",mode==1&&approved)
+   .put("score",s.score).put("morning_score",s.score).put("reason",s.reason).put("risk",s.risk).put("rsi",s.rsi).put("atr_pct",s.atr/q.price*100).put("volume_ratio",s.volume)
+   .put("relative6h",s.rel6).put("return6h",s.ret6).put("return12h",s.ret12).put("return30",s.ret30).put("relative30",s.rel30).put("return90",s.ret90).put("relative90",s.rel90)
+   .put("support",s.support).put("resistance",s.resistance).put("entry_low",q.price).put("entry_high",q.price).put("reference_rr",s.rr).put("net_room_pct",s.netRoom).put("net_risk_pct",s.netRisk)
+   .put("ma20",s.ma20).put("ma60",s.ma60).put("ma120",s.ma120).put("pulse_ratio",s.pulseRatio).put("pulse_change",s.pulseChange).put("pulse_through",s.through)
+   .put("compression",s.compression).put("strategy_version","1.3.0").put("evaluation_approved",ValidationPolicy.approved(mode));
+ }
+ static JSONArray[] ranked(List<JSONObject>items,int limit,int mode)throws JSONException{
+  items.sort((a,b)->{int d=Boolean.compare(b.optBoolean("rule_pass"),a.optBoolean("rule_pass"));if(d!=0)return d;d=Double.compare(b.optDouble("score"),a.optDouble("score"));return d!=0?d:Renderer.obj(a,"quote").optString("market").compareTo(Renderer.obj(b,"quote").optString("market"));});
+  JSONArray watch=new JSONArray(),strict=new JSONArray();
+  for(JSONObject a:items){boolean qualifies=a.optBoolean(mode==1?"pre_qualified":"qualified");if(qualifies&&strict.length()>=5){a.put("qualified",false).put("pre_qualified",false);qualifies=false;}if(watch.length()<limit)watch.put(a);if(qualifies)strict.put(a);}
+  return new JSONArray[]{watch,strict};
+ }
+ static String status(List<JSONObject>a,int failures,boolean stopped){return a.isEmpty()&&(failures>0||stopped)?"error":failures>0?"partial":a.isEmpty()?"insufficient":"ok";}
  static JSONObject finish(Net net,List<Signals.Quote>quotes,Signals.Quote btc,List<Signals.Bar>daily,long now)throws Exception{
   int count=0,up=0;List<Signals.Quote>pool=new ArrayList<>();
-  for(Signals.Quote q:quotes){if(Signals.isAlt(q.market)&&q.time>0&&now-q.time<=600000&&q.time<=now+60000){count++;if(q.dayPct>0)up++;}if(Research.pool(q,now))pool.add(q);}
-  double breadth=count>0?up*100.0/count:Double.NaN;String regime=Signals.btcRegime(btc.price,daily,now);
-  List<JSONObject>all=new ArrayList<>();List<Signals.Bar>bh=new ArrayList<>();int inspected=0,failed=0,invalid=0;
-  String error="",defenseReason="BTC 시간봉 확인 필요";boolean defensive=true,hourlyError=false;
-  pool.sort((a,b)->Double.compare(Signals.screeningScore(b,btc.dayPct),Signals.screeningScore(a,btc.dayPct)));
-  try{bh=Repository.readBars(new JSONArray(net.get("https://api.upbit.com/v1/candles/minutes/60?market=KRW-BTC&count=80")));
-   List<Signals.Bar>closed=Signals.closed(bh,now,Signals.HOUR);double b1=Signals.returnHours(closed,1);
-   defenseReason=regime.startsWith("하락")?"BTC 일봉 하락 추세":regime.startsWith("판단 보류")?"BTC 일봉 검증 불충분":!Signals.finite(breadth)?"시장 상승비율 자료 부족":breadth<35?"상승 종목 35% 미만":!Signals.hourlyContinuous(closed,now,13)||!Signals.finite(b1)?"BTC 시간봉 검증 불충분":b1<-1.2?"BTC 직전 1시간 1.2% 초과 하락":"";defensive=!defenseReason.isEmpty();
-   for(Signals.Quote q:pool.subList(0,Math.min(Research.SCAN_LIMIT,pool.size()))){
-    try{List<Signals.Bar>b=Repository.readBars(new JSONArray(net.get("https://api.upbit.com/v1/candles/minutes/60?market="+q.market+"&count=80")));inspected++;
-     Research.S s=Research.evaluate(q,b,bh,now,defensive);if(s==null){invalid++;continue;}if(defensive)s.risk=defenseReason;
-     JSONObject o=new JSONObject().put("quote",Repository.quoteJson(q)).put("score",s.score).put("morning_score",s.morning).put("qualified",s.qualified).put("pre_qualified",s.preQualified)
-      .put("state",s.state).put("pre_state",s.preState).put("reason",s.reason).put("risk",s.risk).put("rsi",s.rsi).put("atr_pct",s.atr/q.price*100).put("volume_ratio",s.ratio)
-      .put("relative6h",s.rel6).put("return6h",s.ret6).put("return12h",s.ret12).put("resistance",s.high).put("support",s.low).put("ma20",s.ma20).put("ma60",s.ma60)
-      .put("entry_low",s.entryLo).put("entry_high",s.entryHi).put("reference_rr",s.rr);all.add(o);
-    }catch(Exception e){Repository.cancelCheck();failed++;if(failed>=5){error="통신 실패 누적: 일부 종목만 분석";break;}}
-   }
-  }catch(Exception e){Repository.cancelCheck();hourlyError=true;error="시간봉 조회 실패: 분석 보류";}
-  // Keep verified observations visible even when no coin passes every buy condition.
-  all.sort((a,b)->{int d=Boolean.compare(b.optBoolean("qualified"),a.optBoolean("qualified"));return d!=0?d:Double.compare(b.optDouble("morning_score"),a.optDouble("morning_score"));});
-  List<JSONObject> preWatch=new ArrayList<>();int pulseChecked=0,pulseFailed=0;
-  for(JSONObject a:all){
-   boolean base=a.optBoolean("pre_qualified"),dayBase=a.optBoolean("qualified");a.put("pre_qualified",false).put("qualified",false);
-   if(pulseChecked>=Research.DISPLAY_LIMIT){a.put("pulse_risk","단기 거래 확인 전");continue;}pulseChecked++;
+  for(Signals.Quote q:quotes){if(Signals.isAlt(q.market)&&!q.market.equals("KRW-EURC")&&q.time>0&&now-q.time<=600000&&q.time<=now){count++;if(q.dayPct>0)up++;}if(StrategyV130.universe(q,now)&&!q.market.equals("KRW-EURC"))pool.add(q);}
+  pool.sort((a,b)->{int d=Double.compare(b.turnover,a.turnover);return d!=0?d:a.market.compareTo(b.market);});
+  List<Signals.Quote>scan=pool.subList(0,Math.min(StrategyV130.SCAN,pool.size()));
+  List<JSONObject>days=new ArrayList<>(),pre=new ArrayList<>(),longs=new ArrayList<>();List<Signals.Bar>bh=new ArrayList<>();
+  int inspected=0,failed=0,invalid=0,pulseChecked=0,pulseFailed=0,longInspected=0,longFailed=0;boolean hourlyError=false;
+  try{bh=Repository.readBars(new JSONArray(net.get("https://api.upbit.com/v1/candles/minutes/60?market=KRW-BTC&count=80")));}catch(Exception e){Repository.cancelCheck();hourlyError=true;}
+  if(!hourlyError)for(Signals.Quote q:scan){
+   List<Signals.Bar>h;
+   try{h=Repository.readBars(new JSONArray(net.get("https://api.upbit.com/v1/candles/minutes/60?market="+q.market+"&count=80")));inspected++;}
+   catch(Exception e){Repository.cancelCheck();failed++;if(failed>=5)break;continue;}
    try{
-    String code=Renderer.obj(a,"quote").getString("market");
-    List<Signals.Bar> shortBars=Repository.readBars(new JSONArray(net.get("https://api.upbit.com/v1/candles/minutes/5?market="+code+"&count=30")));
-    BeforeNine.Pulse pulse=BeforeNine.pulse(shortBars,now);
-    if(pulse==null){a.put("pulse_risk","완료 5분봉 자료 부족");continue;}
-    a.put("pulse_ratio",pulse.ratio).put("pulse_change",pulse.change).put("pulse_through",pulse.through).put("pulse_rising",pulse.rising)
-     .put("qualified",dayBase&&pulse.passes).put("pre_qualified",base&&pulse.passes)
-     .put("pulse_risk",pulse.passes?"":pulse.ratio<1.3?"최근 15분 거래 증가 부족":pulse.change<.15?"최근 15분 상승 약함":pulse.change>3?"최근 15분 급등·추격 주의":"연속 상승 확인 부족")
-     .put("morning_score",Research.clamp(a.optDouble("morning_score")+Research.clamp((pulse.ratio-1)*6,-6,8)+Research.clamp(pulse.change*3,-12,6)));
-    preWatch.add(a);
-   }catch(Exception e){Repository.cancelCheck();pulseFailed++;a.put("pulse_risk","단기 봉 조회 실패");}
+    List<Signals.Bar>f=Repository.readBars(new JSONArray(net.get("https://api.upbit.com/v1/candles/minutes/5?market="+q.market+"&count=30")));pulseChecked++;
+    StrategyV130.Result d=StrategyV130.shortRule(0,q,h,bh,f,now),p=StrategyV130.shortRule(1,q,h,bh,f,now);
+    if(d!=null)days.add(record(q,d,0));else invalid++;if(p!=null)pre.add(record(q,p,1));
+   }catch(Exception e){Repository.cancelCheck();pulseFailed++;if(pulseFailed>=5)break;}
   }
-  all.sort((a,b)->{int d=Boolean.compare(b.optBoolean("qualified"),a.optBoolean("qualified"));return d!=0?d:Double.compare(b.optDouble("score"),a.optDouble("score"));});
-  JSONArray today=new JSONArray(),strict=new JSONArray();for(JSONObject a:all){if(today.length()<Research.DISPLAY_LIMIT)today.put(a);if(a.optBoolean("qualified")&&strict.length()<Research.DISPLAY_LIMIT)strict.put(a);}
-  preWatch.sort((a,b)->{int d=Boolean.compare(b.optBoolean("pre_qualified"),a.optBoolean("pre_qualified"));return d!=0?d:Double.compare(b.optDouble("morning_score"),a.optDouble("morning_score"));});
-  JSONArray morning=new JSONArray(),morningWatch=new JSONArray();for(JSONObject a:preWatch){if(morningWatch.length()<Research.MORNING_LIMIT)morningWatch.put(a);if(a.optBoolean("pre_qualified")&&morning.length()<Research.MORNING_LIMIT)morning.put(a);}int pre=morning.length();
-  List<JSONObject> longs=new ArrayList<>();int longInspected=0,longFailed=0;boolean longDefense=regime.startsWith("하락")||regime.startsWith("판단 보류");
-  List<Signals.Quote> liquid=new ArrayList<>();for(Signals.Quote q:quotes)if(LongerTerm.pool(q,now))liquid.add(q);
-  liquid.sort((a,b)->Double.compare(b.turnover,a.turnover));
-  for(Signals.Quote q:liquid.subList(0,Math.min(LongerTerm.SCAN_LIMIT,liquid.size()))){
-   try{
-    List<Signals.Bar> bars=Repository.readBars(new JSONArray(net.get("https://api.upbit.com/v1/candles/days?market="+q.market+"&count=160")));longInspected++;
-    LongerTerm.S s=LongerTerm.evaluate(q,bars,daily,now);if(s==null)continue;
-    longs.add(new JSONObject().put("quote",Repository.quoteJson(q)).put("qualified",s.qualified&&!longDefense).put("score",s.score).put("rsi",s.rsi).put("atr_pct",s.atr/q.price*100)
-     .put("risk",longDefense?"BTC 일봉 약세·자료 확인 필요":s.risk).put("ma20",s.ma20).put("ma60",s.ma60).put("ma120",s.ma120).put("return30",s.ret30).put("relative30",s.relative30).put("volume_ratio",s.volumeRatio)
-     .put("support",s.low).put("resistance",s.high).put("entry_low",s.entryLow).put("entry_high",s.entryHigh).put("reference_rr",s.rr));
-   }catch(Exception e){Repository.cancelCheck();longFailed++;if(longFailed>=3)break;}
+  for(Signals.Quote q:scan){
+   try{List<Signals.Bar>b=Repository.readBars(new JSONArray(net.get("https://api.upbit.com/v1/candles/days?market="+q.market+"&count=160")));longInspected++;StrategyV130.Result s=StrategyV130.longRule(q,b,daily,now);if(s!=null)longs.add(record(q,s,2));}
+   catch(Exception e){Repository.cancelCheck();longFailed++;if(longFailed>=3)break;}
   }
-  longs.sort((a,b)->{int d=Boolean.compare(b.optBoolean("qualified"),a.optBoolean("qualified"));return d!=0?d:Double.compare(b.optDouble("score"),a.optDouble("score"));});
-  JSONArray longList=new JSONArray(),longWatch=new JSONArray();for(JSONObject a:longs){if(longWatch.length()<LongerTerm.DISPLAY_LIMIT)longWatch.put(a);if(a.optBoolean("qualified")&&longList.length()<LongerTerm.DISPLAY_LIMIT)longList.put(a);}
-  List<Signals.Bar>d=Signals.closed(daily,now,24*Signals.HOUR);JSONObject technical=new JSONObject();
-  if(d.size()>=60){double hi=0,lo=Double.MAX_VALUE;for(int i=d.size()-20;i<d.size();i++){hi=Math.max(hi,d.get(i).high);lo=Math.min(lo,d.get(i).low);}technical.put("rsi",Signals.rsi(d,14)).put("ma20",Signals.sma(d,20)).put("ma60",Signals.sma(d,60)).put("high20",hi).put("low20",lo);}
-  List<Signals.Bar>closed=Signals.closed(bh,now,Signals.HOUR);double b6=Signals.returnHours(closed,6);if(Signals.finite(b6))technical.put("return6h",b6);
-  String dayStatus=hourlyError||all.isEmpty()&&failed>0?"error":failed+pulseFailed>0?"partial":all.isEmpty()?"insufficient":"ok";
-  String preStatus=hourlyError||preWatch.isEmpty()&&(failed+pulseFailed)>0?"error":failed+pulseFailed>0?"partial":preWatch.isEmpty()?"insufficient":"ok";
-  String longStatus=longs.isEmpty()&&longFailed>0?"error":longFailed>0?"partial":longs.isEmpty()?"insufficient":"ok";
-  return new JSONObject().put("day_status",dayStatus).put("pre_status",preStatus).put("long_status",longStatus).put("day_at",now).put("pre_at",now).put("long_at",now).put("pre_recheck_at",Research.nextNine(now))
-   .put("defensive",defensive).put("defense_reason",defenseReason).put("schema",6).put("fetched_at",System.currentTimeMillis()).put("quote_at",now).put("btc",Repository.quoteJson(btc)).put("daily",Repository.barsJson(daily)).put("btc_technical",technical).put("btc_regime",regime)
-   .put("alt_total",(int)quotes.stream().filter(q->Signals.isAlt(q.market)).count()).put("quote_count",quotes.size()).put("breadth",Signals.finite(breadth)?breadth:JSONObject.NULL).put("advancing",up).put("alt_count",count).put("candidates",strict).put("watchlist",today).put("next_candidates",morning).put("pre_watchlist",morningWatch).put("pre_count",pre)
-   .put("long_candidates",longList).put("long_watchlist",longWatch).put("long_inspected",longInspected).put("long_failed",longFailed).put("long_defensive",longDefense).put("pulse_checked",pulseChecked).put("pulse_failed",pulseFailed).put("screened",pool.size()).put("inspected",inspected).put("invalid",invalid).put("failed",failed).put("screening_error",error+(failed>0?" · 실패 "+failed+"개":"")).put("recheck_at",Research.nextNine(now));
+  JSONArray[]d=ranked(days,30,0),p=ranked(pre,15,1),l=ranked(longs,15,2);
+  double breadth=count>0?up*100.0/count:Double.NaN;String regime=Signals.btcRegime(btc.price,daily,now);boolean defensive=regime.startsWith("하락")||regime.startsWith("판단 보류")||!Signals.finite(breadth)||breadth<35;
+  String defenseReason=regime.startsWith("하락")?"BTC 일봉 하락 추세":regime.startsWith("판단 보류")?"BTC 일봉 자료 부족":breadth<35?"상승 종목 35% 미만":"";
+  JSONObject technical=new JSONObject();List<Signals.Bar>closed=Signals.closed(daily,now,24*Signals.HOUR);
+  if(closed.size()>=60)technical.put("rsi",Signals.rsi(closed,14)).put("ma20",Signals.sma(closed,20)).put("ma60",Signals.sma(closed,60)).put("high20",StrategyV130.high(closed,20)).put("low20",StrategyV130.low(closed,20));
+  double b6=Signals.returnHours(Signals.closed(bh,now,Signals.HOUR),6);if(Signals.finite(b6))technical.put("return6h",b6);
+  return new JSONObject().put("schema",7).put("strategy_version","1.3.0").put("fetched_at",System.currentTimeMillis()).put("quote_at",now)
+   .put("day_status",status(days,failed+pulseFailed,hourlyError)).put("pre_status",status(pre,failed+pulseFailed,hourlyError)).put("long_status",status(longs,longFailed,false))
+   .put("day_at",now).put("pre_at",now).put("long_at",now).put("recheck_at",Research.nextNine(now)).put("pre_recheck_at",Research.nextNine(now))
+   .put("btc",Repository.quoteJson(btc)).put("daily",Repository.barsJson(daily)).put("btc_technical",technical).put("btc_regime",regime)
+   .put("defensive",defensive).put("defense_reason",defenseReason).put("long_defensive",regime.startsWith("하락")||regime.startsWith("판단 보류"))
+   .put("alt_total",count).put("quote_count",quotes.size()).put("breadth",Signals.finite(breadth)?breadth:JSONObject.NULL).put("advancing",up).put("alt_count",count)
+   .put("watchlist",d[0]).put("candidates",d[1]).put("pre_watchlist",p[0]).put("next_candidates",p[1]).put("pre_count",p[1].length()).put("long_watchlist",l[0]).put("long_candidates",l[1])
+   .put("screened",pool.size()).put("inspected",inspected).put("failed",failed).put("invalid",invalid).put("pulse_checked",pulseChecked).put("pulse_failed",pulseFailed).put("long_inspected",longInspected).put("long_failed",longFailed)
+   .put("screening_error",hourlyError?"BTC 시간봉 조회 실패":failed+pulseFailed+longFailed>0?"일부 종목 통신 실패":"");
  }
 }

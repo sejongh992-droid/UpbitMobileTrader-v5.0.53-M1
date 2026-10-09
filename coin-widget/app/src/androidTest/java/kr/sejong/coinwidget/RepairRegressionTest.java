@@ -12,7 +12,7 @@ import static org.junit.Assert.*;
 @RunWith(AndroidJUnit4.class)
 public class RepairRegressionTest {
  final Instrumentation ins=InstrumentationRegistry.getInstrumentation();final Context c=ins.getTargetContext();
- JSONObject seed()throws Exception{JSONObject r=new UpgradeTest().fixture(),m=r.getJSONObject("market");m.put("schema",6).put("pre_watchlist",m.getJSONArray("next_candidates")).put("long_watchlist",m.getJSONArray("long_candidates"));return r;}
+ JSONObject seed()throws Exception{JSONObject r=new UpgradeTest().fixture(),m=r.getJSONObject("market");m.put("schema",7).put("pre_watchlist",m.getJSONArray("next_candidates")).put("long_watchlist",m.getJSONArray("long_candidates"));return r;}
  void store(JSONObject root){c.getSharedPreferences("cache",0).edit().putString("snapshot",root.toString()).commit();c.getSharedPreferences("widget_ui",0).edit().clear().commit();}
  @Test public void tenMinuteGapKeepsRowsButRemovesBuyPermission()throws Exception{
   JSONObject r=seed(),m=r.getJSONObject("market");long now=System.currentTimeMillis();m.put("quote_at",now-600000);store(r);

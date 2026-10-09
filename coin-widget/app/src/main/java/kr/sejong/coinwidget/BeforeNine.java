@@ -5,7 +5,7 @@ import java.util.*;
 final class BeforeNine {
  static final long MINUTE=60_000L;
  static long target(long now){return Research.nextNine(now);}
- static boolean entryWindow(long now){int hour=Instant.ofEpochMilli(now).atZone(ZoneId.of("Asia/Seoul")).getHour();return hour==8;}
+ static boolean entryWindow(long now){ZonedDateTime t=Instant.ofEpochMilli(now).atZone(ZoneId.of("Asia/Seoul"));int minute=t.getHour()*60+t.getMinute();return minute>=510&&minute<536;}
  static long nextCheck(long now){
   ZonedDateTime k=Instant.ofEpochMilli(now).atZone(ZoneId.of("Asia/Seoul"));
   for(int minute:new int[]{30,50}){long t=k.toLocalDate().atTime(8,minute).atZone(k.getZone()).toInstant().toEpochMilli();if(t>now)return t;}

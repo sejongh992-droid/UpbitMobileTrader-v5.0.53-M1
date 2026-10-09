@@ -20,7 +20,7 @@ public class LiveRefreshTest {
   c.getSharedPreferences("settings",0).edit().putBoolean("auto",false).putString("dominance_source","CoinPaprika").commit();SecureStore.clear(c);
   // Start from a fresh schema so onResume does not race the manual action.
   // In v1.2.2 FX is saved first; an automatic request could finish FX before start.
-  JSONObject seed=new JSONObject().put("market",new JSONObject().put("schema",6).put("quote_at",System.currentTimeMillis()).put("fetched_at",System.currentTimeMillis()));
+  JSONObject seed=new JSONObject().put("market",new JSONObject().put("schema",7).put("quote_at",System.currentTimeMillis()).put("fetched_at",System.currentTimeMillis()));
   c.getSharedPreferences("cache",0).edit().putString("snapshot",seed.toString()).commit();
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    long start=System.currentTimeMillis();scenario.onActivity(a->{assertNotNull(a.findViewById(R.id.refresh));a.findViewById(R.id.refresh).performClick();a.refresh();a.refresh();});
@@ -31,7 +31,7 @@ public class LiveRefreshTest {
    ins.waitForIdleSync();SystemClock.sleep(800);Bitmap image=ins.getUiAutomation().takeScreenshot();
    if(image!=null)try(FileOutputStream out=new FileOutputStream(new File(dir,"live-app.png"))){image.compress(Bitmap.CompressFormat.PNG,100,out);}
    assertTrue("Manual refresh did not finish: "+r.optJSONArray("errors"),r.optLong("last_finished")>=start);assertFalse(Repository.RUNNING.get());
-   JSONObject market=r.getJSONObject("market");assertEquals(6,market.getInt("schema"));
+   JSONObject market=r.getJSONObject("market");assertEquals(7,market.getInt("schema"));
    assertTrue(market.getInt("inspected")<=60);assertTrue(market.getInt("long_inspected")<=30);assertTrue(market.getJSONArray("long_candidates").length()<=15);
    for(String key:new String[]{"candidates","next_candidates","long_candidates"})for(int n=0;n<market.getJSONArray(key).length();n++){JSONObject x=market.getJSONArray(key).getJSONObject(n);assertTrue(x.optBoolean(key.equals("next_candidates")?"pre_qualified":"qualified"));assertTrue(x.getDouble("support")<x.getDouble("entry_low"));assertTrue(x.getDouble("entry_high")<x.getDouble("resistance"));}assertTrue(market.getJSONArray("watchlist").length()<=30);assertTrue(market.getJSONArray("next_candidates").length()<=15);
    for(int n=0;n<market.getJSONArray("watchlist").length();n++)assertFalse(market.getJSONArray("watchlist").getJSONObject(n).getJSONObject("quote").getString("name").isEmpty());

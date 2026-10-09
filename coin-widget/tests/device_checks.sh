@@ -4,12 +4,12 @@ mkdir -p device-results
 adb wait-for-device
 adb shell settings put system accelerometer_rotation 0
 adb shell settings put system user_rotation 0
-adb install -r delivery/CoinMarketWidget-1.2.2-ci.apk | tee device-results/install-app.txt
+adb install -r delivery/CoinMarketWidget-1.3.0-ci.apk | tee device-results/install-app.txt
 adb install -r delivery/tests.apk | tee device-results/install-tests.txt
 adb shell pm grant kr.sejong.coinwidget android.permission.POST_NOTIFICATIONS
 adb logcat -c
 set +e
-adb shell am instrument -w -r -e class kr.sejong.coinwidget.StorageRenderTest,kr.sejong.coinwidget.WidgetHostTest,kr.sejong.coinwidget.UpgradeTest,kr.sejong.coinwidget.IntegrityTest,kr.sejong.coinwidget.WidgetInteractionTest,kr.sejong.coinwidget.RepairRegressionTest,kr.sejong.coinwidget.DataRecoveryTest kr.sejong.coinwidget.test/androidx.test.runner.AndroidJUnitRunner | tee device-results/runtime-tests.txt
+adb shell am instrument -w -r -e class kr.sejong.coinwidget.StorageRenderTest,kr.sejong.coinwidget.WidgetHostTest,kr.sejong.coinwidget.UpgradeTest,kr.sejong.coinwidget.IntegrityTest,kr.sejong.coinwidget.WidgetInteractionTest,kr.sejong.coinwidget.RepairRegressionTest,kr.sejong.coinwidget.DataRecoveryTest,kr.sejong.coinwidget.RecommendationPolicyTest kr.sejong.coinwidget.test/androidx.test.runner.AndroidJUnitRunner | tee device-results/runtime-tests.txt
 adb shell am instrument -w -r -e class kr.sejong.coinwidget.LiveRefreshTest kr.sejong.coinwidget.test/androidx.test.runner.AndroidJUnitRunner | tee device-results/live-tests.txt
 adb pull /sdcard/Android/data/kr.sejong.coinwidget/files/test-results device-results/
 adb shell dumpsys package kr.sejong.coinwidget > device-results/package.txt

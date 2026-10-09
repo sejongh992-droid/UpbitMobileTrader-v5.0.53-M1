@@ -6,8 +6,9 @@ public class StrategyTest {
  static long kst(int day,int hour,int minute){return ZonedDateTime.of(2026,10,day,hour,minute,0,0,ZoneId.of("Asia/Seoul")).toInstant().toEpochMilli();}
  static List<Signals.Bar> pulse(long now){List<Signals.Bar>b=new ArrayList<>();for(int i=0;i<16;i++){double p=100+i*.1;b.add(new Signals.Bar(now-(16-i)*300000,p-.08,p+.15,p-.15,p,i>=13?200:100));}return b;}
  public static void main(String[]args){
-  ok(!BeforeNine.entryWindow(kst(9,7,59)),"before entry window");ok(BeforeNine.entryWindow(kst(9,8,0)),"entry begins 08");ok(BeforeNine.entryWindow(kst(9,8,59)),"pre-open entry");ok(!BeforeNine.entryWindow(kst(9,9,0)),"09 entry ends");
+  ok(!BeforeNine.entryWindow(kst(9,7,59)),"before entry window");ok(BeforeNine.entryWindow(kst(9,8,30)),"entry begins 08:30");ok(BeforeNine.entryWindow(kst(9,8,55)),"entry includes 08:55");ok(!BeforeNine.entryWindow(kst(9,9,0)),"09 entry ends");
   ok(BeforeNine.nextCheck(kst(9,8,29))==kst(9,8,30),"08:30 schedule");ok(BeforeNine.nextCheck(kst(9,8,30))==kst(9,8,50),"08:50 schedule");ok(BeforeNine.nextCheck(kst(9,8,50))==kst(10,8,30),"tomorrow schedule");ok(Research.nextNine(kst(9,8,59))==kst(9,9,0),"09 deadline");ok(Research.nextNine(kst(9,9,0))==kst(10,9,0),"new target after 09");
+  ok(!BeforeNine.entryWindow(kst(9,8,29)),"08:29 too early");ok(!BeforeNine.entryWindow(kst(9,8,56)),"08:56 cutoff");
   long now=kst(9,8,50);List<Signals.Bar>b=pulse(now);BeforeNine.Pulse p=BeforeNine.pulse(b,now);ok(p!=null&&p.passes,"growing volume and positive short momentum pass");ok(Math.abs(p.ratio-2)<1e-9,"15 vs prior60 means");ok(p.through==now,"completed bar end");
   List<Signals.Bar> running=new ArrayList<>(b);running.add(new Signals.Bar(now,100,500,1,400,1e8));ok(Math.abs(BeforeNine.pulse(running,now).ratio-p.ratio)<1e-9,"unfinished spike ignored");
   b.remove(7);ok(BeforeNine.pulse(b,now)==null,"missing bar rejects");ok(BeforeNine.pulse(pulse(now),now+300000)==null,"stale pulse rejects");

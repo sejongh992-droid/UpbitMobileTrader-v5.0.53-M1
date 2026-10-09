@@ -35,20 +35,22 @@ final class Dashboard {
  }
  static boolean freshRecommendation(JSONObject root,int mode,long now){
   JSONObject m=Renderer.obj(root,"market");long age=now-SnapshotState.time(m,mode);
-  return Renderer.freshMarket(root)&&m.optInt("schema")>=6&&!SnapshotState.failed(m,mode)&&age>=-60000&&age<=5*60_000L&&(mode!=1||now<SnapshotState.nine(m));
+  return Renderer.freshMarket(root)&&m.optInt("schema")>=7&&!SnapshotState.failed(m,mode)&&age>=-60000&&age<=(mode==1?120_000L:300_000L)&&(mode!=1||now<SnapshotState.nine(m)-120_000L);
  }
  static JSONArray list(JSONObject m,int mode){
   String key=mode==1?"pre_watchlist":mode==2?"long_watchlist":"watchlist";
   JSONArray source=Renderer.arr(m,m.has(key)?key:mode==1?"next_candidates":mode==2?"long_candidates":"candidates"),result=new JSONArray();
   for(int i=0;i<source.length();i++){JSONObject a=source.optJSONObject(i),q=Renderer.obj(a,"quote");double price=q.optDouble("price");if(a!=null&&q.optString("market").matches("KRW-[A-Z0-9]+")&&Signals.finite(price)&&price>0)result.put(a);}return result;
  }
- static boolean qualified(JSONObject m,JSONObject a,int mode){return !SnapshotState.failed(m,mode)&&!m.optBoolean(mode==2?"long_defensive":"defensive",true)&&a.optBoolean(mode==1?"pre_qualified":"qualified");}
+ static boolean qualified(JSONObject m,JSONObject a,int mode){return m.optInt("schema")>=7&&!SnapshotState.failed(m,mode)&&ValidationPolicy.approved(mode)&&a.optBoolean(mode==1?"pre_qualified":"qualified");}
  static String label(JSONObject root,JSONObject a,int mode,long now){
   JSONObject m=Renderer.obj(root,"market");
   if(mode==1&&SnapshotState.nine(m)>0&&now>=SnapshotState.nine(m))return "09시 마감 · 이전 분석";
   if(!freshRecommendation(root,mode,now))return "이전 분석 · 재확인";
-  if(qualified(m,a,mode))return mode==1&&!BeforeNine.entryWindow(now)?"예비 충족 · 08시 재확인":"차트 조건 충족";
-  return "관찰 · 조건 부족";
+  if(!a.optBoolean("rule_pass"))return "관찰 · 조건 부족";
+  if(!ValidationPolicy.approved(mode))return "차트 충족 · 검증 보류";
+  if(mode==1&&!BeforeNine.entryWindow(now))return "예비 충족 · 시간 확인";
+  return qualified(m,a,mode)?"차트·후향 평가 통과":"관찰 · 순위 밖";
  }
  static void visible(RemoteViews v,int id,boolean show){v.setViewVisibility(id,show?View.VISIBLE:View.GONE);}
  static String summary(JSONObject m){return m.optBoolean("defensive",true)?"시장 주의 · "+m.optString("defense_reason","시장 자료 확인 필요"):"BTC "+m.optString("btc_regime","판단 보류")+" · 알트 상승 "+f(m.optDouble("breadth",Double.NaN))+"%";}
@@ -68,12 +70,12 @@ final class Dashboard {
   int pages=1,page=0;v.setOnClickPendingIntent(R.id.page_label,null);visible(v,R.id.page_controls,screen!=SETTINGS);
   if(screen==0){
    int count=rows(c,height);pages=Math.max(1,(items.length()+count-1)/count);page=Math.floorMod(prefs(c).getInt("page"+id,0),pages);
-   visible(v,R.id.breadth,bodyHeight(height)>=250);v.setTextViewText(R.id.breadth,summary(m));
-   String phase="09시 전";int qualifiedCount=0;for(int k=0;k<items.length();k++)if(qualified(m,items.optJSONObject(k),mode))qualifiedCount++;
-   v.setTextViewText(R.id.today,(mode==0?"금일":mode==2?"1~3개월":phase)+(fresh?" · 조건 충족 ":" · 이전 충족 ")+qualifiedCount+" / 분석 "+items.length()+"개");v.removeAllViews(R.id.coin_rows);
+   visible(v,R.id.breadth,bodyHeight(height)>=250);v.setTextViewText(R.id.breadth,ValidationPolicy.state(mode)+"\n"+summary(m));
+   String phase="09시 전";int qualifiedCount=0;for(int k=0;k<items.length();k++)if(items.optJSONObject(k).optBoolean("rule_pass"))qualifiedCount++;
+   v.setTextViewText(R.id.today,(mode==0?"금일":mode==2?"1~3개월":phase)+(fresh?" · 차트 통과 ":" · 이전 통과 ")+qualifiedCount+" / 분석 "+items.length()+"개");v.removeAllViews(R.id.coin_rows);
    if(items.length()==0){RemoteViews empty=new RemoteViews(c.getPackageName(),R.layout.coin_empty);String msg;
     if(Repository.RUNNING.get())msg="최신 시세 분석 중\n잠시 후 이 화면에 표시됩니다.";
-    else if(m.optInt("schema")<6)msg="새로고침을 한 번 눌러 주세요.\n새 분석 목록을 준비합니다.";
+    else if(m.optInt("schema")<7)msg="새로고침을 한 번 눌러 주세요.\n새 분석 목록을 준비합니다.";
     else msg=SnapshotState.state(m,mode)+"\n"+(SnapshotState.failed(m,mode)?"통신 실패로 분석하지 못했습니다.":"연속된 완료 봉을 확보하지 못했습니다.")+"\n새로고침으로 다시 확인하세요.";
     empty.setTextViewText(R.id.empty_label,msg);v.addView(R.id.coin_rows,empty);
    }
@@ -112,7 +114,7 @@ final class Dashboard {
   v.setOnClickPendingIntent(R.id.page_prev,nav(c,id,2,"page:"+((page+pages-1)%pages)));v.setOnClickPendingIntent(R.id.page_next,nav(c,id,3,"page:"+((page+1)%pages)));
   v.setViewVisibility(R.id.page_prev,pages>1?View.VISIBLE:View.INVISIBLE);v.setViewVisibility(R.id.page_next,pages>1?View.VISIBLE:View.INVISIBLE);
   String status=Repository.RUNNING.get()?Repository.phase:root.optBoolean("market_failed")?"조회 실패 · 이전 자료":SnapshotState.failed(m,mode)?SnapshotState.state(m,mode):fresh?SnapshotState.state(m,mode):mode==1&&now>=SnapshotState.nine(m)?"09시 마감 · 재조회":"이전 분석 · 재확인";
-  v.setTextViewText(R.id.updated,"분석 "+Charts.date(SnapshotState.time(m,mode),"MM/dd HH:mm")+" KST · "+status+"\n"+(c.getSharedPreferences("settings",0).getBoolean("auto",true)?"15분 자동 · 절전 시 지연":"수동 조회")+" · 매수 전 새로고침");
+  v.setTextViewText(R.id.updated,"분석 "+Charts.date(SnapshotState.time(m,mode),"MM/dd HH:mm")+" KST · "+status+"\n"+(c.getSharedPreferences("settings",0).getBoolean("auto",true)?"15분 자동 · 절전 시 지연":"수동 조회")+" · "+(mode==1?"2분 유효":"5분 유효"));
   v.setOnClickPendingIntent(R.id.list_home,nav(c,id,BACK));v.setOnClickPendingIntent(R.id.market_home,nav(c,id,MARKET));v.setTextViewText(R.id.market_home,"시장");
   v.setTextViewText(R.id.open_app,"설정");v.setOnClickPendingIntent(R.id.open_app,nav(c,id,SETTINGS));
   v.setTextViewText(R.id.refresh,Repository.RUNNING.get()?"조회 중…":"새로고침");v.setOnClickPendingIntent(R.id.refresh,PendingIntent.getForegroundService(c,12,new Intent(c,RefreshService.class).setAction("kr.sejong.coinwidget.REFRESH"),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE));

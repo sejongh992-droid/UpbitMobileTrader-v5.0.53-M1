@@ -9,7 +9,7 @@ public final class MarketJobService extends JobService {
     private final ConcurrentHashMap<Integer,Run> runs=new ConcurrentHashMap<>();
     private static final class Run {volatile Future<?>future;}
     @Override public boolean onStartJob(JobParameters params){
-        if(params.getJobId()==Scheduler.EXPIRE){MarketWidget.renderAll(this);return false;}
+        if(params.getJobId()==Scheduler.EXPIRE||params.getJobId()==Scheduler.EXPIRE_LONG){MarketWidget.renderAll(this);return false;}
         if(Repository.RUNNING.get()){if(params.getJobId()==Scheduler.MORNING)new Handler(Looper.getMainLooper()).post(()->Scheduler.scheduleMorning(this));return false;}
         Run run=new Run();runs.put(params.getJobId(),run);
         run.future=executor.submit(()->{

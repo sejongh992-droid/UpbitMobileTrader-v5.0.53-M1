@@ -3,7 +3,7 @@ import android.app.job.*;
 import android.content.*;
 import android.os.*;
 final class Scheduler {
- static final int PERIODIC=8201,ONCE=8202,MORNING=8203,EXPIRE=8204;
+ static final int PERIODIC=8201,ONCE=8202,MORNING=8203,EXPIRE=8204,EXPIRE_LONG=8205;
  static void ensure(Context c){
   JobScheduler j=c.getSystemService(JobScheduler.class);
   if(!c.getSharedPreferences("settings",0).getBoolean("auto",true)||MarketWidget.ids(c).length==0){j.cancel(PERIODIC);j.cancel(MORNING);return;}
@@ -22,7 +22,8 @@ final class Scheduler {
   j.schedule(new JobInfo.Builder(MORNING,new ComponentName(c,MarketJobService.class)).setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY).setMinimumLatency(Math.max(0,next-now)).setPersisted(true).setExtras(extras).build());
  }
  static void expire(Context c,long quote,long nine){
-  if(MarketWidget.ids(c).length==0)return;long due=Math.min(quote+300001,nine);
+  if(MarketWidget.ids(c).length==0)return;long due=Math.min(quote+120001,nine-120000);
+  c.getSystemService(JobScheduler.class).schedule(new JobInfo.Builder(EXPIRE_LONG,new ComponentName(c,MarketJobService.class)).setMinimumLatency(Math.max(0,quote+300001-System.currentTimeMillis())).build());
   c.getSystemService(JobScheduler.class).schedule(new JobInfo.Builder(EXPIRE,new ComponentName(c,MarketJobService.class)).setMinimumLatency(Math.max(0,due-System.currentTimeMillis())).build());
  }
  static void request(Context c){
@@ -30,5 +31,5 @@ final class Scheduler {
   if(Build.VERSION.SDK_INT>=31)try{if(j.schedule(b.setExpedited(true).build())==JobScheduler.RESULT_SUCCESS)return;}catch(RuntimeException ignored){}
   j.schedule(new JobInfo.Builder(ONCE,new ComponentName(c,MarketJobService.class)).setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY).build());
  }
- static void cancel(Context c){JobScheduler j=c.getSystemService(JobScheduler.class);for(int id:new int[]{PERIODIC,ONCE,MORNING,EXPIRE})j.cancel(id);}
+ static void cancel(Context c){JobScheduler j=c.getSystemService(JobScheduler.class);for(int id:new int[]{PERIODIC,ONCE,MORNING,EXPIRE,EXPIRE_LONG})j.cancel(id);}
 }
